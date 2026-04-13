@@ -1,4 +1,5 @@
 #include "SettingsPage.h"
+#include "DevConsole.h"
 
 
 #include "minorGems/game/game.h"
@@ -22,6 +23,9 @@
 #include "DropdownList.h"
 
 extern Font * mainFont;
+
+// Defined in PageComponent.cpp — current mouse position in world (UI) coords.
+extern doublePair pointerPos;
 
 extern float musicLoudness;
 
@@ -58,19 +62,20 @@ SettingsPage::SettingsPage()
           // Left Pane
           mRestartButton( mainFont, 360, -272, translate( "restartButton" ) ),
           
-          mGameplayButton( mainFont, -452.5, 288, "GAMEPLAY" ),
-          mControlButton( mainFont, -452.5, 192, "CONTROL" ),
-          mScreenButton( mainFont, -452.5, 96, "SCREEN" ),
-          mSoundButton( mainFont, -452.5, 0, "SOUND" ),
+          mGameplayButton( mainFont, -452.5, 264, "GAMEPLAY" ),
+          mControlButton( mainFont, -452.5, 188, "CONTROL" ),
+          mScreenButton( mainFont, -452.5, 112, "SCREEN" ),
+          mSoundButton( mainFont, -452.5, 36, "SOUND" ),
 #ifdef USE_DISCORD
-          mDiscordButton( mainFont, -452.5, -96, "DISCORD" ),
+          mDiscordButton( mainFont, -452.5, -40, "DISCORD" ),
 #endif // USE_DISCORD
-          mAdvancedButton( mainFont, -452.5, -192, "ADVANCED" ),
+          mAdvancedButton( mainFont, -452.5, -116, "ADVANCED" ),
+          mKeybindsButton( mainFont, -452.5, -192, "KEYBINDS" ),
 
           mBackButton( mainFont, -452.5, -288, translate( "backButton" ) ),
           
           mEditAccountButton( mainFont, -463, 129, translate( "editAccount" ) ),
-
+          
           // Gameplay
           mEnableFOVBox( 561, 128, 4 ),
           mEnableCenterCameraBox( 561, 52, 4 ),
@@ -135,7 +140,13 @@ SettingsPage::SettingsPage()
         mEnableDangerousTileBox(0, -72, 4),
         mGenerateTownPlannerMapsBox( 561, 52, 4 ),
         mEnableShowingHeldFoodPips( 561, 52, 4 ),
-        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ) {
+        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ) ,
+        
+        // Keybinds
+        mClothingSlot( mainFont, 0, 0, 1, true, "", "012345", NULL, 6)
+        
+        
+        {
                             
 
     
@@ -169,6 +180,12 @@ SettingsPage::SettingsPage()
     mCommandShortcuts.setWidth( 360 );
     mCommandShortcuts.useClearButton( true );
     mCommandShortcuts.setFireOnLoseFocus( true );
+
+    // Keybinds
+    addComponent(&mClothingSlot);
+    mClothingSlot.addActionListener(this);
+    mClothingSlot.setFireOnLoseFocus( true );
+    mClothingSlot.setIgnoreArrowKeys( true );
     
 #ifdef USE_DISCORD
     // Discord
@@ -257,6 +274,11 @@ SettingsPage::SettingsPage()
     mEnableFOVBox.addActionListener( this );
     
     // Left pane
+    setButtonStyle( &mKeybindsButton );
+    mKeybindsButton.setSize( 175, 60 );
+    addComponent( &mKeybindsButton );
+    mKeybindsButton.addActionListener( this );
+
     setButtonStyle(&mAdvancedButton);
     mAdvancedButton.setSize(175, 60);
     addComponent(&mAdvancedButton);
@@ -318,6 +340,7 @@ SettingsPage::SettingsPage()
     mDiscordButton.setCursorTip("DISCORD RICH PRESENCE SETTINGS");
 #endif // USE_DISCORD
     mAdvancedButton.setCursorTip("ADVANCED GAMEPLAY SETTINGS");
+    mKeybindsButton.setCursorTip( "REMAP KEYBINDS" );
 
     mBackButton.setCursorTip( "GO BACK" );
     
@@ -359,6 +382,9 @@ SettingsPage::SettingsPage()
     mEnableShowingHeldFoodPips.setCursorTip( "SHOW FOOD PIPS OF THE FOOD YOU'RE HOLDING" );
     mEnableAlwaysShowPlayerLabelsBox.setCursorTip( "ALWAYS SHOW PLAYER NAME LABELS" );
     
+    // Keybinds
+    mClothingSlot.setCursorTip( "0=HAT, 1=TUNIC, 2=FSHOE, 3=BSHOE, 4=BOTTOM, 5=PACK" );
+
     mOldFullscreenSetting = 
         SettingsManager::getIntSetting( "fullscreen", 1 );
     
@@ -488,6 +514,10 @@ SettingsPage::SettingsPage()
 
     mEnableAlwaysShowPlayerLabelsBox.setToggled( alwaysShowPlayerLabelEnabled );
     
+    // Keybinds
+    mClothingSlot.setText("0");
+    mClothingSlot.setListByRawText( "0\n1\n2\n3\n4\n5" );
+
     
 
     mPage = 0;
@@ -504,6 +534,10 @@ SettingsPage::~SettingsPage() {
     clearSoundUsage( &mTestSound );
 
     delete mCursorModeSet;
+
+    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+        delete mKeybindInputs.getElementDirect( i );
+        }
     }
 
 
@@ -904,6 +938,10 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
     else if ( inTarget == &mAdvancedButton ) {
         mPage = 5;
         }
+    else if( inTarget == &mKeybindsButton ) {
+        mPage = 6;
+        buildKeybindWidgets();
+        }
     else if( inTarget == &mCommandShortcuts ) {
         commandShortcutsRawText = mCommandShortcuts.getAndUpdateRawText();
         SettingsManager::setSetting( "commandShortcuts", commandShortcutsRawText );
@@ -979,6 +1017,31 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
         if( newSetting ) alwaysShowPlayerLabelEnabled = true;
         SettingsManager::setSetting("alwaysShowPlayerLabelEnabled",
                                     newSetting);
+        }
+
+    // Check if a KeybindInput fired (binding committed or cleared).
+    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+        if( inTarget == mKeybindInputs.getElementDirect( i ) ) {
+            KeybindInput *inp = mKeybindInputs.getElementDirect( i );
+            KeybindRecord *r = KeybindManager::findAction(
+                inp->getActionName() );
+            if( r != NULL && r->key != 0 ) {
+                const char *conflict =
+                    KeybindManager::findConflict( r->actionName,
+                                                  r->key,
+                                                  r->modifiers );
+                if( conflict != NULL ) {
+                    char *msg = autoSprintf(
+                        "CONFLICT WITH: %s", conflict );
+                    setStatusDirect( msg, true );
+                    delete [] msg;
+                    }
+                }
+            // KeybindManager is already updated and saved.
+            // LivingLifePage::makeActive calls KeybindManager::loadAll()
+            // the next time the player enters the game.
+            break;
+            }
         }
 
     checkRestartRequired();
@@ -1284,6 +1347,18 @@ void SettingsPage::draw( doublePair inViewCenter,
 
         drawTextWithShadow("ALWAYS SHOW NAMES", pos, alignRight);
         }
+
+    // Always show cursor UI coords so widget positions are easy to read off.
+    {
+    char coordBuf[64];
+    sprintf( coordBuf, "%.0f, %.0f", pointerPos.x, pointerPos.y );
+    doublePair coordPos = { pointerPos.x + 16, pointerPos.y + 16 };
+    setDrawColor( 0, 0, 0, 1 );
+    doublePair shadowPos = { coordPos.x - 1, coordPos.y - 1 };
+    mainFont->drawString( coordBuf, shadowPos, alignLeft );
+    setDrawColor( 1, 1, 0, 1 );
+    mainFont->drawString( coordBuf, coordPos, alignLeft );
+    }
     }
 
 
@@ -1450,6 +1525,8 @@ void SettingsPage::updatePage() {
     mGenerateTownPlannerMapsBox.setPosition(0, lineSpacing * -3);
     mEnableShowingHeldFoodPips.setPosition(0, lineSpacing * -4);
     mEnableAlwaysShowPlayerLabelsBox.setPosition(0, lineSpacing * -5);
+
+    mClothingSlot.setPosition( 32 - 16, lineSpacing * 5);
     
     mEnableFOVBox.setVisible( mPage == 0 );
     mEnableCenterCameraBox.setVisible( mPage == 0 );
@@ -1503,6 +1580,8 @@ void SettingsPage::updatePage() {
     mGenerateTownPlannerMapsBox.setVisible(mPage == 5);
     mEnableShowingHeldFoodPips.setVisible(mPage == 5);
     mEnableAlwaysShowPlayerLabelsBox.setVisible(mPage == 5);
+
+    mClothingSlot.setVisible(mPage == 6);
     
     mGameplayButton.setActive( mPage != 0 );
     mControlButton.setActive( mPage != 1 );
@@ -1514,8 +1593,75 @@ void SettingsPage::updatePage() {
 #endif // USE_DISCORD
 
     mAdvancedButton.setActive( mPage != 5 );
+    mKeybindsButton.setActive( mPage != 6 );
 
-}
+    if( mPage == 6 ) {
+        int numActions = mKeybindInputs.size();
+        for (int i = 0; i < numActions; i++) {
+            KeybindInput *inp = mKeybindInputs.getElementDirect( i );
+            if( strcmp( inp->getActionName(), "moveUp" ) == 0 ) {
+                inp->setVisible( false );
+                // inp->setPosition( 50, 260 );
+                }
+        }
+    
+
+            // KeybindInput *inp = mKeybindInputs.getElementDirect( i );
+            // KeybindRecord *r  = KeybindManager::getAction( i );
+
+            // if( r != NULL ) {
+            //     // Pinned — always visible at the specified position,
+            //     // regardless of which sub-page is showing.
+            //     inp->setVisible( true );
+            //     inp->setPosition( r->posX, r->posY );
+            //     }
+            // else {
+            //     // Auto-layout — flows into the two-column grid.
+            //     int pageIdx = autoIdx - startIdx;
+            //     char visible = ( pageIdx >= 0 && pageIdx < actionsPerPage );
+            //     inp->setVisible( visible );
+            //     if( visible ) {
+            //         double x = ( pageIdx < rowsPerPage ) ? colAX : colBX;
+            //         int row  = ( pageIdx < rowsPerPage )
+            //                    ? pageIdx : pageIdx - rowsPerPage;
+            //         inp->setPosition( x, startY + row * stepY );
+            //         }
+            //     autoIdx++;
+            //     }
+
+            } 
+        else {
+            for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+                mKeybindInputs.getElementDirect( i )->setVisible( false );
+                }
+            }
+    }
+
+
+void SettingsPage::buildKeybindWidgets() {
+    if( mKeybindInputs.size() > 0 ) {
+        // already built
+        return;
+        }
+
+    int numActions = KeybindManager::getActionCount();
+    if( numActions == 0 ) {
+        return;
+        }
+
+    for( int i = 0; i < numActions; i++ ) {
+        KeybindRecord *r = KeybindManager::getAction( i );
+        if( r == NULL ) continue;
+
+        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 4,
+                                              r->actionName );
+        inp->setLabelText( r->displayLabel );
+        inp->setVisible( false );
+        inp->addActionListener( this );
+        addComponent( inp );
+        mKeybindInputs.push_back( inp );
+        }
+    }
 
 void SettingsPage::checkRestartRequired() {
     if( mOldFullscreenSetting != mFullscreenBox.getToggled() ||

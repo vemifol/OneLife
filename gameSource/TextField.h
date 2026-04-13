@@ -260,7 +260,7 @@ class TextField : public PageComponent, public ActionListenerList {
         char mUsePasteShortcut;
 
         char mDrawLabelWithShadow;
-        
+
         void fixSelectionStartEnd();
 
 

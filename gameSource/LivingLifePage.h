@@ -544,12 +544,20 @@ class LivingLifePage : public GamePage, public ActionListener {
         void pickUpBabyInRange();
         void pickUpBaby( int x, int y );
         void useBackpack( bool replace = false );
-        void usePocket( int clothingID, bool replace = false );
+        void usePocket( int clothingID, bool replace = false, bool remove = false );
         void useOnSelf();
         void takeOffClothing();
         void takeOffBackpack( int useOrRemove = 0 );
+
+        // Search clothing slots indicated by inSlotMask (CLOTHING_SLOT_* bits)
+        // for inObjectID (or its parent) and take it out via SREMV.
+        // Returns true if a match was found and queued.
+        char removeFromClothing( int inObjectID, int inSlotMask );
+
+        // If holding something, store in hat slot (slot 0).
+        // Otherwise search inSlotMask slots for inObjectID and take it out.
+        void removeFromClothingOrStoreInHat( int inObjectID, int inSlotMask );
         void setOurSendPosXY(int &x, int &y);
-        bool isCharKey(unsigned char c, unsigned char key);
         void drawTileVanillaHighlight( int x, int y, FloatColor floatColor, bool flashing = false, bool border = true );
         void drawTileVanillaRainbowHighlight( int x, int y );
 

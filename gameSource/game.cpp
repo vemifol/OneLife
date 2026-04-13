@@ -15,6 +15,7 @@ int accountHmacVersionNumber = 0;
 
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
@@ -105,6 +106,14 @@ CustomRandomSource randSource( 34957197 );
 #include "whiteSprites.h"
 
 #include "message.h"
+
+#include "KeybindManager.h"
+#include "DevConsole.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#include <cstdio>
+#endif // _WIN32
 
 #ifdef USE_DISCORD
 #include "DiscordController.h"
@@ -2851,6 +2860,167 @@ void pointerUp( float inX, float inY ) {
 
 
 
+// DevConsole — Windows-only debug output window with input thread
+
+#ifdef _WIN32
+
+static FILE *sCustomConsole = NULL;
+static FILE *sConsoleIn     = NULL;
+
+static HANDLE          sConsoleInputThread        = NULL;
+static CRITICAL_SECTION sConsoleInputLock;
+static char            sConsoleInputThreadRunning = false;
+
+#define CONSOLE_INPUT_QUEUE_SIZE 32
+static char *sConsoleInputQueue[ CONSOLE_INPUT_QUEUE_SIZE ];
+static int   sConsoleInputQueueHead = 0;
+static int   sConsoleInputQueueTail = 0;
+
+
+static DWORD WINAPI consoleInputThreadFunc( LPVOID inParam ) {
+    char lineBuf[512];
+
+    while( sConsoleInputThreadRunning ) {
+        if( fgets( lineBuf, sizeof( lineBuf ), sConsoleIn ) == NULL ) {
+            break;
+            }
+
+        // strip trailing \r\n
+        int len = strlen( lineBuf );
+        while( len > 0 &&
+               ( lineBuf[len - 1] == '\n' || lineBuf[len - 1] == '\r' ) ) {
+            lineBuf[ --len ] = '\0';
+            }
+
+        if( len == 0 ) {
+            continue;
+            }
+
+        char *copy = stringDuplicate( lineBuf );
+
+        EnterCriticalSection( &sConsoleInputLock );
+
+        int nextTail = ( sConsoleInputQueueTail + 1 ) % CONSOLE_INPUT_QUEUE_SIZE;
+        if( nextTail != sConsoleInputQueueHead ) {
+            // queue not full
+            sConsoleInputQueue[ sConsoleInputQueueTail ] = copy;
+            sConsoleInputQueueTail = nextTail;
+            }
+        else {
+            // queue full — drop the line
+            delete [] copy;
+            }
+
+        LeaveCriticalSection( &sConsoleInputLock );
+        }
+
+    return 0;
+    }
+
+#endif // _WIN32
+
+
+void openCustomConsole() {
+#ifdef _WIN32
+    if( sCustomConsole != NULL ) return;
+
+    AllocConsole();
+
+    sCustomConsole = fopen( "CONOUT$", "w" );
+    sConsoleIn     = fopen( "CONIN$",  "r" );
+
+    InitializeCriticalSection( &sConsoleInputLock );
+
+    sConsoleInputQueueHead     = 0;
+    sConsoleInputQueueTail     = 0;
+    sConsoleInputThreadRunning = true;
+
+    sConsoleInputThread = CreateThread( NULL, 0,
+                                        consoleInputThreadFunc,
+                                        NULL, 0, NULL );
+#endif // _WIN32
+    }
+
+
+void closeCustomConsole() {
+#ifdef _WIN32
+    if( sCustomConsole == NULL ) return;
+
+    sConsoleInputThreadRunning = false;
+
+    fclose( sCustomConsole );
+    sCustomConsole = NULL;
+
+    // closing sConsoleIn unblocks the fgets in the input thread
+    fclose( sConsoleIn );
+    sConsoleIn = NULL;
+
+    if( sConsoleInputThread != NULL ) {
+        WaitForSingleObject( sConsoleInputThread, 500 );
+        CloseHandle( sConsoleInputThread );
+        sConsoleInputThread = NULL;
+        }
+
+    // flush queue before destroying the lock
+    EnterCriticalSection( &sConsoleInputLock );
+    while( sConsoleInputQueueHead != sConsoleInputQueueTail ) {
+        delete [] sConsoleInputQueue[ sConsoleInputQueueHead ];
+        sConsoleInputQueueHead =
+            ( sConsoleInputQueueHead + 1 ) % CONSOLE_INPUT_QUEUE_SIZE;
+        }
+    LeaveCriticalSection( &sConsoleInputLock );
+
+    DeleteCriticalSection( &sConsoleInputLock );
+
+    FreeConsole();
+#endif // _WIN32
+    }
+
+
+char isCustomConsoleOpen() {
+#ifdef _WIN32
+    return sCustomConsole != NULL;
+#else
+    return false;
+#endif // _WIN32
+    }
+
+
+void cprintf( const char *fmt, ... ) {
+#ifdef _WIN32
+    if( sCustomConsole == NULL ) return;
+    va_list args;
+    va_start( args, fmt );
+    vfprintf( sCustomConsole, fmt, args );
+    va_end( args );
+    fflush( sCustomConsole );
+#endif // _WIN32
+    }
+
+
+char *getConsolePendingInput() {
+#ifdef _WIN32
+    if( sCustomConsole == NULL ) return NULL;
+
+    char *result = NULL;
+
+    EnterCriticalSection( &sConsoleInputLock );
+
+    if( sConsoleInputQueueHead != sConsoleInputQueueTail ) {
+        result = sConsoleInputQueue[ sConsoleInputQueueHead ];
+        sConsoleInputQueueHead =
+            ( sConsoleInputQueueHead + 1 ) % CONSOLE_INPUT_QUEUE_SIZE;
+        }
+
+    LeaveCriticalSection( &sConsoleInputLock );
+
+    return result;
+#else
+    return NULL;
+#endif // _WIN32
+    }
+
+
 void keyDown( unsigned char inASCII ) {
     
     if( inASCII == 27 ) { // ESCAPE KEY
@@ -2863,9 +3033,27 @@ void keyDown( unsigned char inASCII ) {
         }
 
     // taking screen shot is ALWAYS possible
-    if( inASCII == '=' ) {    
+    if( inASCII == '=' ) {
         saveScreenShot( "screen" );
         }
+
+    // toggle dev console — works from any screen
+    {
+    char altKey    = isAltKeyDown();
+    char shiftKey  = isShiftKeyDown();
+    char commandKey = isCommandKeyDown() && !altKey;
+    if( KeybindManager::isPressed( "toggleConsole", inASCII,
+                                   shiftKey, commandKey, altKey ) ) {
+        if( isCustomConsoleOpen() ) {
+            closeCustomConsole();
+            }
+        else {
+            openCustomConsole();
+            }
+        return;
+        }
+    }
+
     /*
     if( inASCII == 'N' ) {
         toggleMipMapMinFilter( true );

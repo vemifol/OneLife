@@ -7,9 +7,10 @@
 #include "SoundUsage.h"
 #include "DropdownList.h"
 #include "Background.h"
-
+#include "KeybindInput.h"
 
 #include "minorGems/ui/event/ActionListener.h"
+#include "minorGems/util/SimpleVector.h"
 
 
 
@@ -74,6 +75,7 @@ class SettingsPage : public GamePage, public ActionListener {
         TextButton mDiscordButton;
 #endif // USE_DISCORD
         TextButton mAdvancedButton;
+        TextButton mKeybindsButton;
 
         TextButton mBackButton;
         
@@ -130,7 +132,18 @@ class SettingsPage : public GamePage, public ActionListener {
         CheckboxButton mEnableShowingHeldFoodPips;
         CheckboxButton mEnableAlwaysShowPlayerLabelsBox;
         
+
+        // Keybinds
+        DropdownList mClothingSlot;
         
+        // Allocated lazily on first visit to the KEYBINDS tab.
+        // Each entry is owned by this page and freed in the destructor.
+        SimpleVector<KeybindInput *> mKeybindInputs;
+
+        // Allocates one KeybindInput per registered action and adds them
+        // as components.  Called once, guarded by mKeybindInputs.size()==0.
+        void buildKeybindWidgets();
+
         void checkRestartButtonVisibility();
-        
+
     };
