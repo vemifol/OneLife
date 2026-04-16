@@ -83,13 +83,16 @@ class PageComponent : public GUIComponent {
 
         
         void base_clearState();
+
+        void setTags( int inTags );
+        int getTags();
         
         
     protected:
         
         // inX, inY specify center position of this component
         // Positions of sub components are relative to this center position
-        PageComponent( double inX, double inY );
+        PageComponent( double inX, double inY, int inTags = 0 );
         
         
         // add for default event handling
@@ -188,6 +191,8 @@ class PageComponent : public GUIComponent {
         PageComponent *mMouseEventHog;
         
         const char *mCursorTip;
+
+        int mTags;
 
     };
 

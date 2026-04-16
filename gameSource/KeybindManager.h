@@ -28,15 +28,16 @@
 // Largest possible display string: "Ctrl+Shift+Alt+CAPS+FOR" = 23 chars + null.
 #define KEYBIND_DISPLAY_MAX 32
 
-
 struct KeybindRecord {
-    char          *actionName;    // e.g. "moveUp"       -- owned by manager
-    char          *displayLabel;  // e.g. "MOVE UP"      -- owned by manager
-    unsigned char  key;           // lowercase ASCII key, 0 = unbound
-    int            modifiers;     // OR of KEYBIND_MOD_* bits
-    char          *defaultKeyStr; // e.g. "w"            -- owned by manager
-    double         posX;
-    double         posY;
+    char *actionName;      // e.g. "moveUp"  -- owned by manager
+    char *displayLabel;    // e.g. "MOVE UP" -- owned by manager
+    unsigned char key;     // lowercase ASCII key, 0 = unbound
+    int modifiers;         // OR of KEYBIND_MOD_* bits that must be held
+    int ignoreModifiers;   // OR of KEYBIND_MOD_* bits whose state is not checked
+    char *defaultKeyStr;   // e.g. "w"       -- owned by manager
+    double posX;
+    double posY;
+    int tags;
     };
 
 
@@ -57,7 +58,8 @@ class KeybindManager {
         // inDefaultKeyStr format: "w", "ctrl+w", "ctrl+shift+w", "space".
         static void registerAction( const char *inActionName,
                                     const char *inDisplayLabel,
-                                    const char *inDefaultKeyStr );
+                                    const char *inDefaultKeyStr,
+                                    int inTags = 0 );
 
         // Reload all bindings from disk (e.g. when settings page is opened).
         static void loadAll();
@@ -69,7 +71,8 @@ class KeybindManager {
         // inKey = 0 means "unbound".
         static void setBinding( const char *inActionName,
                                 unsigned char inKey,
-                                int inModifiers );
+                                int inModifiers,
+                                int inIgnoreModifiers = KEYBIND_MOD_NONE );
 
         // Returns true when inASCII + modifier state matches the named action.
         // Handles ctrl-code offset (ctrl+W arrives as ASCII 23) the same way
@@ -104,9 +107,13 @@ class KeybindManager {
         // modifier flags.  Tokens are case-insensitive.  "space" maps to ' '.
         // Returns false if the string is empty, "none", or otherwise invalid,
         // in which case *outKey is set to 0 and *outModifiers to NONE.
+        // inIgnoreModifiers is optional — pass NULL if not needed.
+        // Token syntax for ignore: prefix a modifier name with ~ e.g. "w+~shift"
+        // means W fires regardless of shift state.
         static char parseKeyString( const char *inStr,
                                     unsigned char *outKey,
-                                    int *outModifiers );
+                                    int *outModifiers,
+                                    int *outIgnoreModifiers = NULL );
 
         // Returns a heap-allocated ini-format string for the named action
         // (e.g. "ctrl+shift+w" or "" if unbound).  Caller must delete[].
@@ -125,7 +132,7 @@ class KeybindManager {
         // (checks plain char, uppercase, and ctrl-code), ignoring modifiers.
         static char baseKeyMatches( const char *inActionName,
                                     unsigned char inASCII );
-
+        
     private:
 
         static SimpleVector<KeybindRecord *> sActions;

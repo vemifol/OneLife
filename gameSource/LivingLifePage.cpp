@@ -68,6 +68,8 @@ static ObjectPickable objectPickable;
 
 #include "ClickableComponent.h"
 
+#include "ComponentTag.h"
+
 #define MAP_D 64
 #define MAP_NUM_CELLS 4096
 
@@ -233,9 +235,9 @@ struct ClothingSearchBind {
     };
 
 static ClothingSearchBind sClothingSearchBinds[] = {
-    { "searchSharpStone", "SEARCH: SHARP STONE", "for",      34,  CLOTHING_SLOT_ALL },
-    { "searchRoundStone", "SEARCH: ROUND STONE", "caps+for", 33,  CLOTHING_SLOT_ALL },
-    { "searchKnife",      "SEARCH: KNIFE",       "bak",      560, CLOTHING_SLOT_ALL },
+    { "searchSharpStone", "SEARCH: SHARP STONE", "for+~shift",      34,  CLOTHING_SLOT_ALL },
+    { "searchRoundStone", "SEARCH: ROUND STONE", "caps+for+~shift", 33,  CLOTHING_SLOT_ALL },
+    { "searchKnife",      "SEARCH: KNIFE",       "bak+~shift",      560, CLOTHING_SLOT_ALL },
     };
 static int sNumClothingSearchBinds = 3;
 
@@ -4360,6 +4362,7 @@ LivingLifePage::LivingLifePage()
         KeybindManager::registerAction( "moveDown", "MOVE DOWN", "s" );
         KeybindManager::registerAction( "moveLeft", "MOVE LEFT", "a" );
         KeybindManager::registerAction( "moveRight", "MOVE RIGHT", "d" );
+        
 
         // Movement — ctrl (action beta: interact with adjacent tile)
         KeybindManager::registerAction( "ctrlMoveUp", "ACTION UP", "ctrl+w" );
@@ -4373,18 +4376,35 @@ LivingLifePage::LivingLifePage()
         KeybindManager::registerAction( "shiftMoveLeft", "SHIFT ACTION LEFT", "shift+a" );
         KeybindManager::registerAction( "shiftMoveRight", "SHIFT ACTION RIGHT", "shift+d" );
 
-        // Inventory / interaction
-        KeybindManager::registerAction( "useBackpack", "BACKPACK", "q" );
-        KeybindManager::registerAction( "useBackpackReplace", "BACKPACK (REPLACE)", "shift+q" );
-        KeybindManager::registerAction( "selfBackpackTransRemv", "BACKPACK (TRANS/REMV)", "b" );
-        KeybindManager::registerAction( "selfBackpackTrans", "BACKPACK (TRANS)", "shift+b" );
-        KeybindManager::registerAction( "selfBackpackRemv", "BACKPACK (REMV)", "ctrl+b" );
+        // Clothes
+        KeybindManager::registerAction( "useHat", "HAT", "c", TAG_HAT );
+        KeybindManager::registerAction( "useHatReplace", "HAT (REPLACE)", "shift+c", TAG_HAT );
+        KeybindManager::registerAction( "useHatRemv", "HAT (REMV)", "ctrl+c", TAG_HAT );
+
+        KeybindManager::registerAction( "useTop", "TOP", "f", TAG_TOP );
+        KeybindManager::registerAction( "useTopReplace", "TOP (REPLACE)", "shift+f", TAG_TOP );
+        KeybindManager::registerAction( "useTopRemv", "TOP (REMV)", "ctrl+f", TAG_TOP );
+
+        KeybindManager::registerAction( "useBottom", "BOTTOM", "t", TAG_BOTTOM );
+        KeybindManager::registerAction( "useBottomReplace", "BOTTOM (REPLACE)", "shift+t", TAG_BOTTOM );
+        KeybindManager::registerAction( "useBottomRemv", "BOTTOM (REMV)", "ctrl+t", TAG_BOTTOM );
+
+        KeybindManager::registerAction( "useBackpack", "BACKPACK", "q", TAG_BACK );
+        KeybindManager::registerAction( "useBackpackReplace", "BACKPACK (REPLACE)", "shift+q", TAG_BACK );
+
+        KeybindManager::registerAction( "selfBackpackTransRemv", "BACKPACK (TRANS/REMV)", "b", TAG_BACK );
+        KeybindManager::registerAction( "selfBackpackTrans", "BACKPACK (TRANS)", "shift+b", TAG_BACK );
+        KeybindManager::registerAction( "selfBackpackRemv", "BACKPACK (REMV)", "ctrl+b", TAG_BACK );
+
+
+
+        
+
+
         KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e" );
         KeybindManager::registerAction( "removeClothing", "REMOVE CLOTHING", "shift+e" );
         KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c" );
-        KeybindManager::registerAction( "useBottom", "BOTTOM", "t" );
-        KeybindManager::registerAction( "useBottomReplace", "BOTTOM (REPLACE)", "shift+t" );
-        KeybindManager::registerAction( "useBottomRemv", "BOTTOM (REMV)", "ctrl+t" );
+
 
         // Clothing search — driven from sClothingSearchBinds table
         for( int i = 0; i < sNumClothingSearchBinds; i++ ) {
@@ -28028,45 +28048,35 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                 return;
                 }
 
-            if( KeybindManager::isPressed( "useBackpack", inASCII, shiftKey, commandKey, altKey ) ) {
-                useBackpack();
+
+            //CLOTHES
+            if( KeybindManager::isPressed( "useHat", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 0 );
                 return;
                 }
-            if( KeybindManager::isPressed( "useBackpackReplace", inASCII, shiftKey, commandKey, altKey ) ) {
-                useBackpack( true );
+            if( KeybindManager::isPressed( "useHatReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 0, true );
                 return;
                 }
-            if( KeybindManager::isPressed( "ctrlUseBackpack", inASCII, shiftKey, commandKey, altKey ) ) {
-                useBackpack( true );
+            if( KeybindManager::isPressed( "useHatRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 0, false, true );
                 return;
                 }
 
-            if( KeybindManager::isPressed( "eatSelf", inASCII, shiftKey, commandKey, altKey ) ) {
-                useOnSelf();
+
+            if( KeybindManager::isPressed( "useTop", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 1 );
                 return;
                 }
-            if( KeybindManager::isPressed( "removeClothing", inASCII, shiftKey, commandKey, altKey ) ) {
-                takeOffClothing();
+            if( KeybindManager::isPressed( "useTopReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 1, true );
+                return;
+                }
+            if( KeybindManager::isPressed( "useTopRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+                usePocket( 1, false, true );
                 return;
                 }
 
-            if( KeybindManager::isPressed( "pickUpBaby", inASCII, shiftKey, commandKey, altKey ) ) {
-                pickUpBabyInRange();
-                return;
-                }
-
-            if( KeybindManager::isPressed( "selfBackpackTransRemv", inASCII, shiftKey, commandKey, altKey ) ) {
-                takeOffBackpack();
-                return;
-                }
-            if( KeybindManager::isPressed( "selfBackpackTrans", inASCII, shiftKey, commandKey, altKey ) ) {
-                takeOffBackpack( 1 );
-                return;
-                }
-            if( KeybindManager::isPressed( "selfBackpackRemv", inASCII, shiftKey, commandKey, altKey ) ) {
-                takeOffBackpack( 2 );
-                return;
-                }
 
             if( KeybindManager::isPressed( "useBottom", inASCII, shiftKey, commandKey, altKey ) ) {
                 usePocket( 4 );
@@ -28081,6 +28091,42 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                 return;
                 }
 
+
+            if( KeybindManager::isPressed( "useBackpack", inASCII, shiftKey, commandKey, altKey ) ) {
+                useBackpack();
+                return;
+                }
+            if( KeybindManager::isPressed( "useBackpackReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+                useBackpack( true );
+                return;
+                }
+            if( KeybindManager::isPressed( "selfBackpackTransRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+                takeOffBackpack();
+                return;
+                }
+            if( KeybindManager::isPressed( "selfBackpackTrans", inASCII, shiftKey, commandKey, altKey ) ) {
+                takeOffBackpack( 1 );
+                return;
+                }
+            if( KeybindManager::isPressed( "selfBackpackRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+                takeOffBackpack( 2 );
+                return;
+                }
+
+            //MISC
+            if( KeybindManager::isPressed( "eatSelf", inASCII, shiftKey, commandKey, altKey ) ) {
+                useOnSelf();
+                return;
+                }
+            if( KeybindManager::isPressed( "removeClothing", inASCII, shiftKey, commandKey, altKey ) ) {
+                takeOffClothing();
+                return;
+                }
+
+            if( KeybindManager::isPressed( "pickUpBaby", inASCII, shiftKey, commandKey, altKey ) ) {
+                pickUpBabyInRange();
+                return;
+                }
             // Clothing search — driven from sClothingSearchBinds table near top of file.
             // To add a new search binding, add a row there.
             {

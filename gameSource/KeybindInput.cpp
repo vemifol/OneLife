@@ -116,10 +116,10 @@ void KeybindInput::keyDown( unsigned char inASCII ) {
 
     // Build modifier flags from current physical key state
     int mods = KEYBIND_MOD_NONE;
-    if( isShiftKeyDown()   ) mods |= KEYBIND_MOD_SHIFT;
+    if( isShiftKeyDown() ) mods |= KEYBIND_MOD_SHIFT;
     if( isControlKeyDown() ) mods |= KEYBIND_MOD_CTRL;
-    if( isAltKeyDown()     ) mods |= KEYBIND_MOD_ALT;
-    if( isCapsLockDown()   ) mods |= KEYBIND_MOD_CAPS;
+    if( isAltKeyDown() ) mods |= KEYBIND_MOD_ALT;
+    if( isCapsLockDown() ) mods |= KEYBIND_MOD_CAPS;
 
     // Recover base key from ctrl-code.
     // ctrl+A arrives as ASCII 1, ctrl+B as 2, ..., ctrl+Z as 26.
@@ -172,18 +172,18 @@ void KeybindInput::draw() {
 
     double rectStartX = - mWide / 2 + pixWidth;
     double rectStartY = - mHigh / 2 + pixWidth;
-    double rectEndX   =   mWide / 2 - pixWidth;
-    double rectEndY   =   mHigh / 2 - pixWidth;
+    double rectEndX = mWide / 2 - pixWidth;
+    double rectEndY = mHigh / 2 - pixWidth;
 
     setDrawColor( 0.25, 0.25, 0.25, 1 );
     drawRect( rectStartX, rectStartY, rectEndX, rectEndY );
 
     // Draw label to the left
     if( mLabelText != NULL ) {
-        double xPos = - mWide / 2 - mBorderWide;
+        double xPos = mWide / 2 + mBorderWide;
         doublePair labelPos = { xPos, 0 };
         setDrawColor( 1, 1, 1, 1 );
-        mFont->drawString( mLabelText, labelPos, alignRight );
+        mFont->drawString( mLabelText, labelPos, alignLeft );
         }
 
     // Draw text — left-aligned from border, no scroll, no caret, no fade

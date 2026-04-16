@@ -59,6 +59,7 @@ KeybindManager.cpp \
 KeybindInput.cpp \
 SettingsPage.cpp \
 CheckboxButton.cpp \
+LinkedCheckbox.cpp \
 ValueSlider.cpp \
 SpriteButton.cpp \
 SpriteToggleButton.cpp \

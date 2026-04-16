@@ -3,6 +3,7 @@
  */
 
 #include "KeybindManager.h"
+#include "ComponentTag.h"
 
 #include "minorGems/util/stringUtils.h"
 #include "minorGems/io/file/File.h"
@@ -40,15 +41,18 @@ void KeybindManager::deInit() {
 
 void KeybindManager::registerAction( const char *inActionName,
                                      const char *inDisplayLabel,
-                                     const char *inDefaultKeyStr ) {
+                                     const char *inDefaultKeyStr,
+                                     int inTags ) {
     KeybindRecord *r = new KeybindRecord;
-    r->actionName    = stringDuplicate( inActionName );
-    r->displayLabel  = stringDuplicate( inDisplayLabel );
+    r->actionName = stringDuplicate( inActionName );
+    r->displayLabel = stringDuplicate( inDisplayLabel );
     r->defaultKeyStr = stringDuplicate( inDefaultKeyStr );
-    r->key           = 0;
-    r->modifiers     = KEYBIND_MOD_NONE;
-    r->posX          = 0;
-    r->posY          = 0;
+    r->key = 0;
+    r->modifiers = KEYBIND_MOD_NONE;
+    r->ignoreModifiers = KEYBIND_MOD_NONE;
+    r->posX = 0;
+    r->posY = 0;
+    r->tags = inTags;
     sActions.push_back( r );
     }
 
@@ -76,17 +80,21 @@ void KeybindManager::loadAll() {
 
             unsigned char key = 0;
             int mods = KEYBIND_MOD_NONE;
-            parseKeyString( buf, &key, &mods );
-            r->key       = key;
+            int ignoreMods = KEYBIND_MOD_NONE;
+            parseKeyString( buf, &key, &mods, &ignoreMods );
+            r->key = key;
             r->modifiers = mods;
+            r->ignoreModifiers = ignoreMods;
             }
         else {
             // file not found — apply default
             unsigned char key = 0;
             int mods = KEYBIND_MOD_NONE;
-            parseKeyString( r->defaultKeyStr, &key, &mods );
-            r->key       = key;
+            int ignoreMods = KEYBIND_MOD_NONE;
+            parseKeyString( r->defaultKeyStr, &key, &mods, &ignoreMods );
+            r->key = key;
             r->modifiers = mods;
+            r->ignoreModifiers = ignoreMods;
             }
         }
     }
@@ -116,13 +124,15 @@ void KeybindManager::saveAction( const char *inActionName ) {
 
 void KeybindManager::setBinding( const char *inActionName,
                                   unsigned char inKey,
-                                  int inModifiers ) {
+                                  int inModifiers,
+                                  int inIgnoreModifiers ) {
     KeybindRecord *r = findAction( inActionName );
     if( r == NULL ) {
         return;
         }
-    r->key       = inKey;
+    r->key = inKey;
     r->modifiers = inModifiers;
+    r->ignoreModifiers = inIgnoreModifiers;
     }
 
 
@@ -137,16 +147,20 @@ char KeybindManager::isPressed( const char *inActionName,
         return false;
         }
 
-    // check modifier requirements
     char needShift = ( r->modifiers & KEYBIND_MOD_SHIFT ) != 0;
     char needCtrl  = ( r->modifiers & KEYBIND_MOD_CTRL  ) != 0;
     char needAlt   = ( r->modifiers & KEYBIND_MOD_ALT   ) != 0;
     char needCaps  = ( r->modifiers & KEYBIND_MOD_CAPS  ) != 0;
 
-    if( needShift != ( inShift != 0 ) ) return false;
-    if( needCtrl  != ( inCtrl  != 0 ) ) return false;
-    if( needAlt   != ( inAlt   != 0 ) ) return false;
-    if( needCaps  != ( inCaps  != 0 ) ) return false;
+    char ignShift = ( r->ignoreModifiers & KEYBIND_MOD_SHIFT ) != 0;
+    char ignCtrl  = ( r->ignoreModifiers & KEYBIND_MOD_CTRL  ) != 0;
+    char ignAlt   = ( r->ignoreModifiers & KEYBIND_MOD_ALT   ) != 0;
+    char ignCaps  = ( r->ignoreModifiers & KEYBIND_MOD_CAPS  ) != 0;
+
+    if( !ignShift && needShift != ( inShift != 0 ) ) return false;
+    if( !ignCtrl  && needCtrl  != ( inCtrl  != 0 ) ) return false;
+    if( !ignAlt   && needAlt   != ( inAlt   != 0 ) ) return false;
+    if( !ignCaps  && needCaps  != ( inCaps  != 0 ) ) return false;
 
     unsigned char k = r->key;
 
@@ -156,7 +170,6 @@ char KeybindManager::isPressed( const char *inActionName,
         }
 
     // ctrl-codes: ctrl+A arrives as ASCII 1, ctrl+B as 2, etc.
-    // This mirrors the legacy isCharKey() c+64 == toupper(key) check.
     if( inCtrl && inASCII > 0 && inASCII < 27 ) {
         unsigned char ctrlBase = 'a' + inASCII - 1;
         return ( ctrlBase == (unsigned char)tolower( k ) );
@@ -174,9 +187,6 @@ int KeybindManager::getActionCount() {
 
 
 KeybindRecord *KeybindManager::getAction( int inIndex ) {
-    if( inIndex < 0 || inIndex >= sActions.size() ) {
-        return NULL;
-        }
     return sActions.getElementDirect( inIndex );
     }
 
@@ -203,10 +213,10 @@ void KeybindManager::buildDisplayString( unsigned char inKey,
         }
 
     // canonical order: Ctrl, Shift, Alt, CAPS
-    if( inModifiers & KEYBIND_MOD_CTRL  ) strcat( outBuf, "Ctrl+" );
+    if( inModifiers & KEYBIND_MOD_CTRL )  strcat( outBuf, "Ctrl+" );
     if( inModifiers & KEYBIND_MOD_SHIFT ) strcat( outBuf, "Shift+" );
-    if( inModifiers & KEYBIND_MOD_ALT   ) strcat( outBuf, "Alt+" );
-    if( inModifiers & KEYBIND_MOD_CAPS  ) strcat( outBuf, "CAPS+" );
+    if( inModifiers & KEYBIND_MOD_ALT )   strcat( outBuf, "Alt+" );
+    if( inModifiers & KEYBIND_MOD_CAPS )  strcat( outBuf, "CAPS+" );
 
     if( inKey == 30 ) {
         strcat( outBuf, "FOR" );
@@ -219,7 +229,7 @@ void KeybindManager::buildDisplayString( unsigned char inKey,
         }
     else {
         int len = strlen( outBuf );
-        outBuf[len]     = (char)toupper( inKey );
+        outBuf[len] = (char)toupper( inKey );
         outBuf[len + 1] = '\0';
         }
     }
@@ -227,9 +237,13 @@ void KeybindManager::buildDisplayString( unsigned char inKey,
 
 char KeybindManager::parseKeyString( const char *inStr,
                                       unsigned char *outKey,
-                                      int *outModifiers ) {
-    *outKey       = 0;
+                                      int *outModifiers,
+                                      int *outIgnoreModifiers ) {
+    *outKey = 0;
     *outModifiers = KEYBIND_MOD_NONE;
+    if( outIgnoreModifiers != NULL ) {
+        *outIgnoreModifiers = KEYBIND_MOD_NONE;
+        }
 
     if( inStr == NULL || inStr[0] == '\0' ) {
         return false;
@@ -247,21 +261,30 @@ char KeybindManager::parseKeyString( const char *inStr,
 
     unsigned char foundKey = 0;
     int foundMods = KEYBIND_MOD_NONE;
+    int foundIgnore = KEYBIND_MOD_NONE;
 
     for( int i = 0; i < numTokens; i++ ) {
         char *tok = tokens[i];
 
-        if( strcmp( tok, "ctrl" ) == 0 ) {
-            foundMods |= KEYBIND_MOD_CTRL;
+        // ~ prefix means "ignore this modifier"
+        char isIgnore = ( tok[0] == '~' );
+        char *name = isIgnore ? &tok[1] : tok;
+
+        if( strcmp( name, "ctrl" ) == 0 ) {
+            if( isIgnore ) foundIgnore |= KEYBIND_MOD_CTRL;
+            else           foundMods   |= KEYBIND_MOD_CTRL;
             }
-        else if( strcmp( tok, "shift" ) == 0 ) {
-            foundMods |= KEYBIND_MOD_SHIFT;
+        else if( strcmp( name, "shift" ) == 0 ) {
+            if( isIgnore ) foundIgnore |= KEYBIND_MOD_SHIFT;
+            else           foundMods   |= KEYBIND_MOD_SHIFT;
             }
-        else if( strcmp( tok, "alt" ) == 0 ) {
-            foundMods |= KEYBIND_MOD_ALT;
+        else if( strcmp( name, "alt" ) == 0 ) {
+            if( isIgnore ) foundIgnore |= KEYBIND_MOD_ALT;
+            else           foundMods   |= KEYBIND_MOD_ALT;
             }
-        else if( strcmp( tok, "caps" ) == 0 ) {
-            foundMods |= KEYBIND_MOD_CAPS;
+        else if( strcmp( name, "caps" ) == 0 ) {
+            if( isIgnore ) foundIgnore |= KEYBIND_MOD_CAPS;
+            else           foundMods   |= KEYBIND_MOD_CAPS;
             }
         else if( strcmp( tok, "for" ) == 0 ) {
             foundKey = 30;
@@ -287,8 +310,11 @@ char KeybindManager::parseKeyString( const char *inStr,
         return false;
         }
 
-    *outKey       = foundKey;
+    *outKey = foundKey;
     *outModifiers = foundMods;
+    if( outIgnoreModifiers != NULL ) {
+        *outIgnoreModifiers = foundIgnore;
+        }
     return true;
     }
 
@@ -303,10 +329,14 @@ char *KeybindManager::getKeyString( const char *inActionName ) {
     buf[0] = '\0';
 
     // canonical order: ctrl, shift, alt, caps (lowercase for .ini)
-    if( r->modifiers & KEYBIND_MOD_CTRL  ) strcat( buf, "ctrl+" );
-    if( r->modifiers & KEYBIND_MOD_SHIFT ) strcat( buf, "shift+" );
-    if( r->modifiers & KEYBIND_MOD_ALT   ) strcat( buf, "alt+" );
-    if( r->modifiers & KEYBIND_MOD_CAPS  ) strcat( buf, "caps+" );
+    if( r->modifiers & KEYBIND_MOD_CTRL )         strcat( buf, "ctrl+" );
+    if( r->modifiers & KEYBIND_MOD_SHIFT )        strcat( buf, "shift+" );
+    if( r->modifiers & KEYBIND_MOD_ALT )          strcat( buf, "alt+" );
+    if( r->modifiers & KEYBIND_MOD_CAPS )         strcat( buf, "caps+" );
+    if( r->ignoreModifiers & KEYBIND_MOD_CTRL )   strcat( buf, "~ctrl+" );
+    if( r->ignoreModifiers & KEYBIND_MOD_SHIFT )  strcat( buf, "~shift+" );
+    if( r->ignoreModifiers & KEYBIND_MOD_ALT )    strcat( buf, "~alt+" );
+    if( r->ignoreModifiers & KEYBIND_MOD_CAPS )   strcat( buf, "~caps+" );
 
     if( r->key == 30 ) {
         strcat( buf, "for" );
@@ -319,7 +349,7 @@ char *KeybindManager::getKeyString( const char *inActionName ) {
         }
     else {
         int len = strlen( buf );
-        buf[len]     = (char)tolower( r->key );
+        buf[len] = (char)tolower( r->key );
         buf[len + 1] = '\0';
         }
 
@@ -345,6 +375,7 @@ const char *KeybindManager::findConflict( const char *inExcludeActionName,
         }
     return NULL;
     }
+
 
 char KeybindManager::baseKeyMatches( const char *inActionName,
                                       unsigned char inASCII ) {

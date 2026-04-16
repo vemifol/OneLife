@@ -143,9 +143,7 @@ SettingsPage::SettingsPage()
         mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ) ,
         
         // Keybinds
-        mClothingSlot( mainFont, 0, 0, 1, true, "", "012345", NULL, 6)
-        
-        
+        mClothingFilter( mainFont, 0, 0, 4, LinkedCheckbox::single, alignRight, 4 )
         {
                             
 
@@ -182,10 +180,14 @@ SettingsPage::SettingsPage()
     mCommandShortcuts.setFireOnLoseFocus( true );
 
     // Keybinds
-    addComponent(&mClothingSlot);
-    mClothingSlot.addActionListener(this);
-    mClothingSlot.setFireOnLoseFocus( true );
-    mClothingSlot.setIgnoreArrowKeys( true );
+    addComponent(&mClothingFilter);
+    mClothingFilter.addActionListener( this );
+    mClothingFilter.setStartPosition(-185, 264);
+    mClothingFilter.setAutoSpacing(0, -45);
+    mClothingFilter.setLabel(0, "HAT");
+    mClothingFilter.setLabel(1, "TOP");
+    mClothingFilter.setLabel(2, "BOTTOM");
+    mClothingFilter.setLabel(3, "BACK");
     
 #ifdef USE_DISCORD
     // Discord
@@ -383,7 +385,6 @@ SettingsPage::SettingsPage()
     mEnableAlwaysShowPlayerLabelsBox.setCursorTip( "ALWAYS SHOW PLAYER NAME LABELS" );
     
     // Keybinds
-    mClothingSlot.setCursorTip( "0=HAT, 1=TUNIC, 2=FSHOE, 3=BSHOE, 4=BOTTOM, 5=PACK" );
 
     mOldFullscreenSetting = 
         SettingsManager::getIntSetting( "fullscreen", 1 );
@@ -515,8 +516,7 @@ SettingsPage::SettingsPage()
     mEnableAlwaysShowPlayerLabelsBox.setToggled( alwaysShowPlayerLabelEnabled );
     
     // Keybinds
-    mClothingSlot.setText("0");
-    mClothingSlot.setListByRawText( "0\n1\n2\n3\n4\n5" );
+
 
     
 
@@ -1044,6 +1044,11 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
             }
         }
 
+    if( inTarget == &mClothingFilter ) {
+        updatePage();
+        return;
+        }
+
     checkRestartRequired();
     updatePage();
     }
@@ -1526,7 +1531,7 @@ void SettingsPage::updatePage() {
     mEnableShowingHeldFoodPips.setPosition(0, lineSpacing * -4);
     mEnableAlwaysShowPlayerLabelsBox.setPosition(0, lineSpacing * -5);
 
-    mClothingSlot.setPosition( 32 - 16, lineSpacing * 5);
+    mClothingFilter.setStartPosition( 32 - 16, lineSpacing * 5);
     
     mEnableFOVBox.setVisible( mPage == 0 );
     mEnableCenterCameraBox.setVisible( mPage == 0 );
@@ -1581,8 +1586,20 @@ void SettingsPage::updatePage() {
     mEnableShowingHeldFoodPips.setVisible(mPage == 5);
     mEnableAlwaysShowPlayerLabelsBox.setVisible(mPage == 5);
 
-    mClothingSlot.setVisible(mPage == 6);
-    
+    mClothingFilter.setVisible(mPage == 6);
+
+    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+        mKeybindInputs.getElementDirect( i )->setVisible( false );
+        }
+
+    if( mPage == 6 ) {
+        double inputX = 100;
+        double startY = 264;
+
+        for( int i = 0; i < mClothingFilter.getNumOptions(); i++ ) {
+            setVisibleByTag( (1 << i), mClothingFilter.isChecked(i) );
+            }
+    }
     mGameplayButton.setActive( mPage != 0 );
     mControlButton.setActive( mPage != 1 );
     mScreenButton.setActive( mPage != 2 );
@@ -1594,53 +1611,11 @@ void SettingsPage::updatePage() {
 
     mAdvancedButton.setActive( mPage != 5 );
     mKeybindsButton.setActive( mPage != 6 );
-
-    if( mPage == 6 ) {
-        int numActions = mKeybindInputs.size();
-        for (int i = 0; i < numActions; i++) {
-            KeybindInput *inp = mKeybindInputs.getElementDirect( i );
-            if( strcmp( inp->getActionName(), "moveUp" ) == 0 ) {
-                inp->setVisible( false );
-                // inp->setPosition( 50, 260 );
-                }
-        }
-    
-
-            // KeybindInput *inp = mKeybindInputs.getElementDirect( i );
-            // KeybindRecord *r  = KeybindManager::getAction( i );
-
-            // if( r != NULL ) {
-            //     // Pinned — always visible at the specified position,
-            //     // regardless of which sub-page is showing.
-            //     inp->setVisible( true );
-            //     inp->setPosition( r->posX, r->posY );
-            //     }
-            // else {
-            //     // Auto-layout — flows into the two-column grid.
-            //     int pageIdx = autoIdx - startIdx;
-            //     char visible = ( pageIdx >= 0 && pageIdx < actionsPerPage );
-            //     inp->setVisible( visible );
-            //     if( visible ) {
-            //         double x = ( pageIdx < rowsPerPage ) ? colAX : colBX;
-            //         int row  = ( pageIdx < rowsPerPage )
-            //                    ? pageIdx : pageIdx - rowsPerPage;
-            //         inp->setPosition( x, startY + row * stepY );
-            //         }
-            //     autoIdx++;
-            //     }
-
-            } 
-        else {
-            for( int i = 0; i < mKeybindInputs.size(); i++ ) {
-                mKeybindInputs.getElementDirect( i )->setVisible( false );
-                }
-            }
     }
 
 
 void SettingsPage::buildKeybindWidgets() {
     if( mKeybindInputs.size() > 0 ) {
-        // already built
         return;
         }
 
@@ -1651,10 +1626,9 @@ void SettingsPage::buildKeybindWidgets() {
 
     for( int i = 0; i < numActions; i++ ) {
         KeybindRecord *r = KeybindManager::getAction( i );
-        if( r == NULL ) continue;
-
-        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 4,
-                                              r->actionName );
+        char *name = r->actionName;
+        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 4, name );
+        inp->setTags(r->tags);
         inp->setLabelText( r->displayLabel );
         inp->setVisible( false );
         inp->addActionListener( this );
@@ -1678,5 +1652,14 @@ void SettingsPage::checkRestartRequired() {
     else {
         setStatus( NULL, false );
         mRestartButton.setVisible( false );
+        }
+    }
+
+void SettingsPage::setVisibleByTag( int inTag, char inVisible ) {
+    for( int i=0; i<mComponents.size(); i++ ) {
+        PageComponent *c = *mComponents.getElement(i);
+        if( c->getTags() & inTag ) {
+            c->setVisible( inVisible );
+            }
         }
     }

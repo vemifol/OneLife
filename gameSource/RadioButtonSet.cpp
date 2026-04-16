@@ -13,7 +13,7 @@ RadioButtonSet::RadioButtonSet( Font *inDisplayFont, double inX, double inY,
                                 double inDrawScale,
                                 char inDrawNamesWithShadow )
         : PageComponent( inX, inY ),
-          mHover( false ), 
+          mHover( false ),
           mDisplayFont( inDisplayFont ),
           mNumItems( inNumItems ),
           mItemNames( new char *[ inNumItems ] ),
@@ -23,13 +23,13 @@ RadioButtonSet::RadioButtonSet( Font *inDisplayFont, double inX, double inY,
           mSelectedItem( 0 ),
           mDrawNamesWithShadow( inDrawNamesWithShadow ) {
 
-    
+
     for( int i=0; i<mNumItems; i++ ) {
         mItemNames[i] = stringDuplicate( inItemNames[i] );
-        
+
         mCheckboxes[i] = new CheckboxButton( 0, 0 - inDrawScale * 10 * i,
                                              inDrawScale );
-        
+
         addComponent( mCheckboxes[i] );
         mCheckboxes[i]->addActionListener( this );
         }
@@ -37,7 +37,7 @@ RadioButtonSet::RadioButtonSet( Font *inDisplayFont, double inX, double inY,
     mCheckboxes[mSelectedItem]->setToggled( true );
     }
 
-          
+
 
 RadioButtonSet::~RadioButtonSet() {
     for( int i=0; i<mNumItems; i++ ) {
@@ -75,7 +75,7 @@ int RadioButtonSet::getSelectedItem() {
 
 void RadioButtonSet::setSelectedItem( int inIndex ) {
     mSelectedItem = inIndex;
-    
+
     for( int i=0; i<mNumItems; i++ ) {
         if( i == mSelectedItem ) {
             mCheckboxes[i]->setToggled( true );
@@ -114,19 +114,19 @@ void RadioButtonSet::draw() {
     setDrawColor( 1, 1, 1, 1 );
 
     double sep = -mCheckboxSep;
-    
+
     TextAlignment a = alignRight;
-    
-    
+
+
     if( mRightLabels ) {
         sep = +mCheckboxSep;
         a = alignLeft;
         }
-    
+
 
     for( int i=0; i<mNumItems; i++ ) {
         doublePair pos = mCheckboxes[i]->getPosition();
-    
+
         pos.x += sep;
         pos.y -= 2;
 
@@ -136,7 +136,7 @@ void RadioButtonSet::draw() {
             mDisplayFont->drawString( mItemNames[i], add(pos, shadowOffset), a );
             setDrawColor( 1, 1, 1, 1 );
             }
-        
+
         mDisplayFont->drawString( mItemNames[i], pos, a );
         }
     }
