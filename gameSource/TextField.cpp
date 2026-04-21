@@ -158,8 +158,7 @@ void TextField::setLabelText( const char *inLabelText ) {
     if( mLabelText != NULL ) {
         delete [] mLabelText;
         }
-    
-    mLabelText = stringDuplicate( inLabelText );
+    mLabelText = ( inLabelText != NULL ) ? stringDuplicate( inLabelText ) : NULL;
     }
 
 

@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES
 #include "LivingLifePage.h"
 
 #include "objectBank.h"
@@ -73,6 +74,7 @@ static ObjectPickable objectPickable;
 #define MAP_D 64
 #define MAP_NUM_CELLS 4096
 
+
 extern int versionNumber;
 extern int dataVersionNumber;
 
@@ -104,7 +106,6 @@ static int holdingYumOrMeh = 0;
 static char shouldMoveCamera = true;
 
 bool showUseOnHoverEnabled = false;
-
 
 extern double viewWidth;
 extern double viewHeight;
@@ -206,38 +207,33 @@ char objectSearchEnabled = false;
 char familyDisplayEnabled = false;
 char dangerousTileEnabled = false;
 char alwaysShowPlayerLabelEnabled = false;
+char toggleAlpha = false;
+char toggleBeta = false;
+
 
 static JenkinsRandomSource randSource( 340403 );
 static JenkinsRandomSource remapRandSource( 340403 );
 
-// Slot bitmask constants for ClothingSearchBind::slotMask.
-// Slot indices match clothingByIndex: 0=hat, 1=tunic, 2=frontShoe,
-// 3=backShoe, 4=bottom, 5=backpack.
-#define CLOTHING_SLOT_HAT       0x01
-#define CLOTHING_SLOT_TUNIC     0x02
-#define CLOTHING_SLOT_FRONTSHOE 0x04
-#define CLOTHING_SLOT_BACKSHOE  0x08
-#define CLOTHING_SLOT_BOTTOM    0x10
-#define CLOTHING_SLOT_BACKPACK  0x20
-#define CLOTHING_SLOT_ALL       0x3F  // all six slots
 
-// Clothing-search bindings.
-// Each entry searches the slots indicated by slotMask for objectID and
-// retrieves or stores it.  Add a new row here to expose an additional
-// search action — registration, keyDown dispatch, and settings-UI display
-// are all driven from this table automatically.
+#define CLOTHING_SLOT_HAT       0
+#define CLOTHING_SLOT_TUNIC     1 << 0
+#define CLOTHING_SLOT_FRONTSHOE 1 << 1
+#define CLOTHING_SLOT_BACKSHOE  1 << 2
+#define CLOTHING_SLOT_BOTTOM    1 << 3
+#define CLOTHING_SLOT_BACKPACK  1 << 4
+#define CLOTHING_SLOT_ALL       1 << 5 
 struct ClothingSearchBind {
     const char *actionName;
     const char *displayLabel;
     const char *defaultKey;
-    int         objectID;
-    int         slotMask;   // OR of CLOTHING_SLOT_* bits
+    int objectID;
+    int slotMask;   
     };
 
 static ClothingSearchBind sClothingSearchBinds[] = {
-    { "searchSharpStone", "SEARCH: SHARP STONE", "for+~shift",      34,  CLOTHING_SLOT_ALL },
-    { "searchRoundStone", "SEARCH: ROUND STONE", "caps+for+~shift", 33,  CLOTHING_SLOT_ALL },
-    { "searchKnife",      "SEARCH: KNIFE",       "bak+~shift",      560, CLOTHING_SLOT_ALL },
+    { "searchSharpStone", "SEARCH: SHARP STONE", "for", 34, CLOTHING_SLOT_ALL },
+    { "searchRoundStone", "SEARCH: ROUND STONE", "for+ctrl", 33, CLOTHING_SLOT_ALL },
+    { "searchKnife", "SEARCH: KNIFE", "back", 560, CLOTHING_SLOT_ALL },
     };
 static int sNumClothingSearchBinds = 3;
 
@@ -4009,7 +4005,6 @@ void LivingLifePage::removeFromClothingOrStoreInHat( int inObjectID,
     if( ourLiveObject == NULL ) return;
 
     if( ourLiveObject->holdingID > 0 ) {
-        // holding something — store it in hat slot
         usePocket( 0 );
         return;
         }
@@ -4049,8 +4044,6 @@ void LivingLifePage::takeOffClothing() {
     
     // If holding clothing, put it on
     if (ourLiveObject->holdingID > 0) {
-        ObjectRecord *held = getObject(ourLiveObject->holdingID);
-
         // if held object is not wearable
         // if (!held || held->clothing == 'n') return;
 
@@ -4352,77 +4345,68 @@ LivingLifePage::LivingLifePage()
     static char keybindsRegistered = false;
     if( !keybindsRegistered ) {
         keybindsRegistered = true;
+  
+        KeybindManager::registerAction( "moveUp", "UP", "w", TAG_MOVE, KEY_ONLY );
+        KeybindManager::registerAction( "moveLeft", "LEFT", "a", TAG_MOVE, KEY_ONLY );
+        KeybindManager::registerAction( "moveDown", "DOWN", "s", TAG_MOVE, KEY_ONLY );
+        KeybindManager::registerAction( "moveRight", "RIGHT", "d", TAG_MOVE, KEY_ONLY );
+        KeybindManager::registerAction( "alphaBelow", "BELOW", "space", TAG_MOVE, KEY_ONLY );
 
-        // Tile actions
-        KeybindManager::registerAction( "actOnTile", "ACT ON TILE", "space" );
-        KeybindManager::registerAction( "ctrlActOnTile", "ACT ON TILE (CTRL)", "ctrl+space" );
-
-        // Movement — plain
-        KeybindManager::registerAction( "moveUp", "MOVE UP", "w" );
-        KeybindManager::registerAction( "moveDown", "MOVE DOWN", "s" );
-        KeybindManager::registerAction( "moveLeft", "MOVE LEFT", "a" );
-        KeybindManager::registerAction( "moveRight", "MOVE RIGHT", "d" );
-        
-
-        // Movement — ctrl (action beta: interact with adjacent tile)
-        KeybindManager::registerAction( "ctrlMoveUp", "ACTION UP", "ctrl+w" );
-        KeybindManager::registerAction( "ctrlMoveDown", "ACTION DOWN", "ctrl+s" );
-        KeybindManager::registerAction( "ctrlMoveLeft", "ACTION LEFT", "ctrl+a" );
-        KeybindManager::registerAction( "ctrlMoveRight", "ACTION RIGHT", "ctrl+d" );
-
-        // Movement — shift (action alpha: interact with adjacent tile)
-        KeybindManager::registerAction( "shiftMoveUp", "SHIFT ACTION UP", "shift+w" );
-        KeybindManager::registerAction( "shiftMoveDown", "SHIFT ACTION DOWN", "shift+s" );
-        KeybindManager::registerAction( "shiftMoveLeft", "SHIFT ACTION LEFT", "shift+a" );
-        KeybindManager::registerAction( "shiftMoveRight", "SHIFT ACTION RIGHT", "shift+d" );
+        KeybindManager::registerAction( "alphaModifier", "ALPHA", "shift", TAG_MOVE_MODIFIER, MODIFIER_ONLY);
+        KeybindManager::registerAction( "betaModifier", "BETA", "ctrl", TAG_MOVE_MODIFIER, MODIFIER_ONLY);
+        KeybindManager::registerAction( "alphaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
+        KeybindManager::registerAction( "betaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
 
         // Clothes
-        KeybindManager::registerAction( "useHat", "HAT", "c", TAG_HAT );
-        KeybindManager::registerAction( "useHatReplace", "HAT (REPLACE)", "shift+c", TAG_HAT );
-        KeybindManager::registerAction( "useHatRemv", "HAT (REMV)", "ctrl+c", TAG_HAT );
+        KeybindManager::registerAction( "useHat", "USE", "ctrl+t", TAG_HAT );
+        KeybindManager::registerAction( "useHatReplace", "REPLACE", "ctrl+shift+t", TAG_HAT );
+        KeybindManager::registerAction( "useHatRemv", "REMV", "", TAG_HAT );
 
-        KeybindManager::registerAction( "useTop", "TOP", "f", TAG_TOP );
-        KeybindManager::registerAction( "useTopReplace", "TOP (REPLACE)", "shift+f", TAG_TOP );
-        KeybindManager::registerAction( "useTopRemv", "TOP (REMV)", "ctrl+f", TAG_TOP );
+        KeybindManager::registerAction( "useTop", "USE", "shift+t", TAG_TOP );
+        KeybindManager::registerAction( "useTopReplace", "REPLACE", "", TAG_TOP );
+        KeybindManager::registerAction( "useTopRemv", "REMV", "", TAG_TOP );
 
-        KeybindManager::registerAction( "useBottom", "BOTTOM", "t", TAG_BOTTOM );
-        KeybindManager::registerAction( "useBottomReplace", "BOTTOM (REPLACE)", "shift+t", TAG_BOTTOM );
-        KeybindManager::registerAction( "useBottomRemv", "BOTTOM (REMV)", "ctrl+t", TAG_BOTTOM );
+        KeybindManager::registerAction( "useBottom", "USE", "t", TAG_BOTTOM );
+        KeybindManager::registerAction( "useBottomReplace", "REPLACE", "", TAG_BOTTOM );
+        KeybindManager::registerAction( "useBottomRemv", "REMV", "", TAG_BOTTOM );
 
-        KeybindManager::registerAction( "useBackpack", "BACKPACK", "q", TAG_BACK );
-        KeybindManager::registerAction( "useBackpackReplace", "BACKPACK (REPLACE)", "shift+q", TAG_BACK );
+        KeybindManager::registerAction( "useBackpack", "USE", "q", TAG_BACK );
+        KeybindManager::registerAction( "useBackpackReplace", "REPLACE", "shift+q", TAG_BACK );
 
-        KeybindManager::registerAction( "selfBackpackTransRemv", "BACKPACK (TRANS/REMV)", "b", TAG_BACK );
-        KeybindManager::registerAction( "selfBackpackTrans", "BACKPACK (TRANS)", "shift+b", TAG_BACK );
-        KeybindManager::registerAction( "selfBackpackRemv", "BACKPACK (REMV)", "ctrl+b", TAG_BACK );
+        KeybindManager::registerAction( "selfBackpackTransRemv", "TRANS/REMV", "b", TAG_BACK );
+        KeybindManager::registerAction( "selfBackpackTrans", "TRANS", "shift+b", TAG_BACK );
+        KeybindManager::registerAction( "selfBackpackRemv", "REMV", "ctrl+b", TAG_BACK );
 
-
-
-        
-
-
-        KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e" );
+        KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e", 0, KEY_ONLY );
         KeybindManager::registerAction( "removeClothing", "REMOVE CLOTHING", "shift+e" );
-        KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c" );
+        KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c", 0, KEY_ONLY );
 
 
-        // Clothing search — driven from sClothingSearchBinds table
+        // Clothing search 
         for( int i = 0; i < sNumClothingSearchBinds; i++ ) {
             KeybindManager::registerAction(
                 sClothingSearchBinds[i].actionName,
                 sClothingSearchBinds[i].displayLabel,
                 sClothingSearchBinds[i].defaultKey );
             }
-        // KeybindManager::registerAction( "shiftUsePocket", "POCKET (SHIFT)", "shift+t" );
-        // KeybindManager::registerAction( "ctrlUsePocket", "POCKET (CTRL)", "ctrl+t" );
-        // KeybindManager::registerAction( "ctrlShiftUsePocket", "POCKET (CTRL+SHIFT)", "ctrl+shift+t" );
 
         // Panel toggles
         KeybindManager::registerAction( "toggleConsole", "TOGGLE DEV CONSOLE", "alt+c" );
-        KeybindManager::registerAction( "coordinatesToggle", "COORDINATES PANEL", "g" );
-        KeybindManager::registerAction( "yumFinder", "YUM FINDER", "y" );
-        KeybindManager::registerAction( "objectSearchToggle", "OBJECT SEARCH PANEL", "j" );
-        KeybindManager::registerAction( "familyDisplayToggle", "FAMILY DISPLAY PANEL", "p" );
+        KeybindManager::registerAction( "coordinatesToggle", "COORDINATES PANEL", "g", 0, KEY_ONLY );
+        KeybindManager::registerAction( "yumFinder", "YUM FINDER", "y", 0, KEY_ONLY );
+        KeybindManager::registerAction( "objectSearchToggle", "OBJECT SEARCH PANEL", "j", 0, KEY_ONLY );
+        KeybindManager::registerAction( "familyDisplayToggle", "FAMILY DISPLAY PANEL", "p", 0, KEY_ONLY );
+
+        // View toggles
+        KeybindManager::registerAction( "xray", "X-RAY MODE", "x", 0, KEY_ONLY );
+        KeybindManager::registerAction( "hideHud", "HIDE HUD", "`", 0, KEY_ONLY );
+        KeybindManager::registerAction( "hintBack", "HINT BACK", "z", 0, KEY_ONLY );
+        KeybindManager::registerAction( "nameLabels", "PLAYER NAMES", "n", 0, KEY_ONLY );
+        KeybindManager::registerAction( "heldUse", "HELD USE", "e", 0, KEY_ONLY );
+        KeybindManager::registerAction( "stopCamera", "STOP CAMERA", "f", 0, KEY_ONLY );
+        KeybindManager::registerAction( "gridToggle", "GRID TOGGLE", "shift+k" );
+        KeybindManager::registerAction( "sayCommand", "SAY COMMAND", "/" );
+        KeybindManager::registerAction( "openChat", "OPEN CHAT", "enter", 0, KEY_ONLY );
 
         KeybindManager::init();
         }
@@ -4924,6 +4908,8 @@ void LivingLifePage::clearLiveObjects() {
 
 
 LivingLifePage::~LivingLifePage() {
+    KeybindManager::deInit();
+
     printf( "Total received = %d bytes (+%d in headers), "
             "total sent = %d bytes (+%d in headers)\n",
             numServerBytesRead, overheadServerBytesRead,
@@ -12465,37 +12451,19 @@ void LivingLifePage::draw( doublePair inViewCenter,
                 }
             }
         else if( coordinatesSlipComponent.mHover ) {
-            char keyBuf[KEYBIND_DISPLAY_MAX];
-            KeybindRecord *kbr = KeybindManager::findAction( "coordinatesToggle" );
-            if( kbr && kbr->key ) {
-                KeybindManager::buildDisplayString( kbr->key, kbr->modifiers, keyBuf );
-                }
-            else {
-                strcpy( keyBuf, "[NONE]" );
-                }
+            char *keyBuf = KeybindManager::buildKeyString( "coordinatesToggle", true );
             coordsTips = autoSprintf( "%s (%s)", translate( "coordsTips" ), keyBuf );
+            delete [] keyBuf;
             }
         else if( objectSearchSlipComponent.mHover ) {
-            char keyBuf[KEYBIND_DISPLAY_MAX];
-            KeybindRecord *kbr = KeybindManager::findAction( "objectSearchToggle" );
-            if( kbr && kbr->key ) {
-                KeybindManager::buildDisplayString( kbr->key, kbr->modifiers, keyBuf );
-                }
-            else {
-                strcpy( keyBuf, "[NONE]" );
-                }
+            char *keyBuf = KeybindManager::buildKeyString( "objectSearchToggle", true );
             coordsTips = autoSprintf( "%s (%s)", translate( "objSearchTips" ), keyBuf );
+            delete [] keyBuf;
             }
         else if( familyDisplaySlipComponent.mHover ) {
-            char keyBuf[KEYBIND_DISPLAY_MAX];
-            KeybindRecord *kbr = KeybindManager::findAction( "familyDisplayToggle" );
-            if( kbr && kbr->key ) {
-                KeybindManager::buildDisplayString( kbr->key, kbr->modifiers, keyBuf );
-                }
-            else {
-                strcpy( keyBuf, "[NONE]" );
-                }
+            char *keyBuf = KeybindManager::buildKeyString( "familyDisplayToggle", true );
             coordsTips = autoSprintf( "%s (%s)", translate( "famDisplayTips" ), keyBuf );
+            delete [] keyBuf;
             }
         if( coordsTips != NULL ) {
             drawCursorTips( coordsTips );
@@ -24522,7 +24490,7 @@ char LivingLifePage::isSameRoad( int inFloor, GridPos inFloorPos,
 
   
 void LivingLifePage::makeActive( char inFresh ) {
-    // unhold E key
+    if( inFresh ) KeybindManager::clearAllPressed();
     mEKeyDown = false;
     mZKeyDown = false;
     mXKeyDown = false;
@@ -27983,158 +27951,134 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
 
     if( SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
         if( !mSayField.isFocused() && !vogMode ) {
-
-            if( KeybindManager::isPressed( "ctrlActOnTile", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionBetaRelativeToMe( 0, 0 );
-                return;
-                }
-            if( KeybindManager::isPressed( "actOnTile", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionAlphaRelativeToMe( 0, 0 );
-                return;
-                }
-
-            if( KeybindManager::isPressed( "moveUp", inASCII, shiftKey, commandKey, altKey ) ) {
+            char alphaActive = toggleAlpha || KeybindManager::isActive( "alphaModifier" );
+            char betaActive = toggleBeta || KeybindManager::isActive( "betaModifier" );
+            if( KeybindManager::isActive( "moveUp" ) ) {
+                if( alphaActive ) { actionAlphaRelativeToMe( 0, 1 ); return; }
+                if( betaActive ) { actionBetaRelativeToMe( 0, 1 ); return; }
                 upKeyDown = true;
                 allowAutoRun = isAltKeyDown();
                 return;
                 }
-            if( KeybindManager::isPressed( "moveLeft", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "moveLeft" ) ) {
+                if( alphaActive ) { actionAlphaRelativeToMe( -1, 0 ); return; }
+                if( betaActive ) { actionBetaRelativeToMe( -1, 0 ); return; }
                 leftKeyDown = true;
                 allowAutoRun = isAltKeyDown();
                 return;
                 }
-            if( KeybindManager::isPressed( "moveDown", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "moveDown" ) ) {
+                if( alphaActive ) { actionAlphaRelativeToMe( 0, -1 ); return; }
+                if( betaActive ) { actionBetaRelativeToMe( 0, -1 ); return; }
                 downKeyDown = true;
                 allowAutoRun = isAltKeyDown();
                 return;
                 }
-            if( KeybindManager::isPressed( "moveRight", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "moveRight" ) ) {
+                if( alphaActive ) { actionAlphaRelativeToMe( 1, 0 ); return; }
+                if( betaActive ) { actionBetaRelativeToMe( 1, 0 ); return; }
                 rightKeyDown = true;
                 allowAutoRun = isAltKeyDown();
                 return;
                 }
-
-            if( KeybindManager::isPressed( "ctrlMoveUp", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionBetaRelativeToMe( 0, 1 );
+            if( KeybindManager::isActive( "alphaBelow" ) ) {
+                if( betaActive ) { actionBetaRelativeToMe( 0, 0 ); return; }
+                actionAlphaRelativeToMe( 0, 0 );
                 return;
                 }
-            if( KeybindManager::isPressed( "ctrlMoveLeft", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionBetaRelativeToMe( -1, 0 );
+            if( KeybindManager::isActive( "alphaToggle" ) ) {
+                toggleAlpha = !toggleAlpha;
                 return;
                 }
-            if( KeybindManager::isPressed( "ctrlMoveDown", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionBetaRelativeToMe( 0, -1 );
-                return;
-                }
-            if( KeybindManager::isPressed( "ctrlMoveRight", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionBetaRelativeToMe( 1, 0 );
+            if( KeybindManager::isActive( "betaToggle" ) ) {
+                toggleBeta = !toggleBeta;
                 return;
                 }
 
-            if( KeybindManager::isPressed( "shiftMoveUp", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionAlphaRelativeToMe( 0, 1 );
-                return;
-                }
-            if( KeybindManager::isPressed( "shiftMoveLeft", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionAlphaRelativeToMe( -1, 0 );
-                return;
-                }
-            if( KeybindManager::isPressed( "shiftMoveDown", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionAlphaRelativeToMe( 0, -1 );
-                return;
-                }
-            if( KeybindManager::isPressed( "shiftMoveRight", inASCII, shiftKey, commandKey, altKey ) ) {
-                actionAlphaRelativeToMe( 1, 0 );
-                return;
-                }
 
 
             //CLOTHES
-            if( KeybindManager::isPressed( "useHat", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useHat" ) ) {
                 usePocket( 0 );
                 return;
                 }
-            if( KeybindManager::isPressed( "useHatReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useHatReplace" ) ) {
                 usePocket( 0, true );
                 return;
                 }
-            if( KeybindManager::isPressed( "useHatRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useHatRemv" ) ) {
                 usePocket( 0, false, true );
                 return;
                 }
 
 
-            if( KeybindManager::isPressed( "useTop", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useTop" ) ) {
                 usePocket( 1 );
                 return;
                 }
-            if( KeybindManager::isPressed( "useTopReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useTopReplace" ) ) {
                 usePocket( 1, true );
                 return;
                 }
-            if( KeybindManager::isPressed( "useTopRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useTopRemv" ) ) {
                 usePocket( 1, false, true );
                 return;
                 }
 
 
-            if( KeybindManager::isPressed( "useBottom", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useBottom" ) ) {
                 usePocket( 4 );
                 return;
                 }
-            if( KeybindManager::isPressed( "useBottomReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useBottomReplace" ) ) {
                 usePocket( 4, true );
                 return;
                 }
-            if( KeybindManager::isPressed( "useBottomRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useBottomRemv" ) ) {
                 usePocket( 4, false, true );
                 return;
                 }
 
 
-            if( KeybindManager::isPressed( "useBackpack", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useBackpack" ) ) {
                 useBackpack();
                 return;
                 }
-            if( KeybindManager::isPressed( "useBackpackReplace", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "useBackpackReplace" ) ) {
                 useBackpack( true );
                 return;
                 }
-            if( KeybindManager::isPressed( "selfBackpackTransRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "selfBackpackTransRemv" ) ) {
                 takeOffBackpack();
                 return;
                 }
-            if( KeybindManager::isPressed( "selfBackpackTrans", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "selfBackpackTrans" ) ) {
                 takeOffBackpack( 1 );
                 return;
                 }
-            if( KeybindManager::isPressed( "selfBackpackRemv", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "selfBackpackRemv" ) ) {
                 takeOffBackpack( 2 );
                 return;
                 }
 
             //MISC
-            if( KeybindManager::isPressed( "eatSelf", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "eatSelf" ) ) {
                 useOnSelf();
                 return;
                 }
-            if( KeybindManager::isPressed( "removeClothing", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "removeClothing" ) ) {
                 takeOffClothing();
                 return;
                 }
 
-            if( KeybindManager::isPressed( "pickUpBaby", inASCII, shiftKey, commandKey, altKey ) ) {
+            if( KeybindManager::isActive( "pickUpBaby" ) ) {
                 pickUpBabyInRange();
                 return;
                 }
-            // Clothing search — driven from sClothingSearchBinds table near top of file.
-            // To add a new search binding, add a row there.
             {
-            char capsKey = isCapsLockDown();
             for( int i = 0; i < sNumClothingSearchBinds; i++ ) {
-                if( KeybindManager::isPressed(
-                        sClothingSearchBinds[i].actionName,
-                        inASCII, shiftKey, commandKey, altKey, capsKey ) ) {
+                if( KeybindManager::isActive(
+                        sClothingSearchBinds[i].actionName ) ) {
                     removeFromClothingOrStoreInHat(
                         sClothingSearchBinds[i].objectID,
                         sClothingSearchBinds[i].slotMask );
@@ -28197,11 +28141,11 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
         !mSayField.isFocused() && !vogMode ) {
 
         char coordinatesKeyPressed = coordinatesEnabled &&
-            KeybindManager::isPressed( "coordinatesToggle", inASCII, shiftKey, commandKey, altKey );
+            KeybindManager::isActive( "coordinatesToggle" );
         char objectSearchKeyPressed = objectSearchEnabled &&
-            KeybindManager::isPressed( "objectSearchToggle", inASCII, shiftKey, commandKey, altKey );
+            KeybindManager::isActive( "objectSearchToggle" );
         char familyDisplayKeyPressed = familyDisplayEnabled &&
-            KeybindManager::isPressed( "familyDisplayToggle", inASCII, shiftKey, commandKey, altKey );
+            KeybindManager::isActive( "familyDisplayToggle" );
 
         if( leftPanelComponent.mActive &&
             ( coordinatesKeyPressed || objectSearchKeyPressed || familyDisplayKeyPressed )
@@ -28268,10 +28212,53 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
         }
 
     if( yumFinderEnabled && !mSayField.isFocused() && !vogMode &&
-        KeybindManager::isPressed( "yumFinder", inASCII, shiftKey, commandKey, altKey ) ) {
+        KeybindManager::isActive( "yumFinder" ) ) {
         runningYumFinder = true;
         // make sure the animation plays as soon as the key is pressed
         bouncingAnimationStepOffset = -livingLifeStepCount;
+        }
+
+    if( !mSayField.isFocused() ) {
+        if( KeybindManager::isActive( "xray" ) ) mXKeyDown = true;
+        if( mUsingSteam && KeybindManager::isActive( "hintBack" ) ) mZKeyDown = true;
+        if( KeybindManager::isActive( "heldUse" ) ) mEKeyDown = true;
+        if( SettingsManager::getIntSetting( "keyboardActions", 1 ) &&
+            KeybindManager::isActive( "stopCamera" ) ) shouldMoveCamera = false;
+        }
+
+    if( !TextField::isAnyFocused() && !vogMode ) {
+        if( KeybindManager::isActive( "hideHud" ) ) mGraveKeyDown = true;
+        if( !commandKey && !shiftKey && KeybindManager::isActive( "nameLabels" ) ) {
+            alwaysShowPlayerLabelEnabled = !alwaysShowPlayerLabelEnabled;
+            SettingsManager::setSetting( "alwaysShowPlayerLabelEnabled",
+                                         alwaysShowPlayerLabelEnabled );
+            return;
+            }
+        if( KeybindManager::isActive( "gridToggle" ) ) {
+            drawGridToggle = !drawGridToggle;
+            return;
+            }
+        }
+
+    if( !TextField::isAnyFocused() ) {
+        if( KeybindManager::isActive( "sayCommand" ) ) {
+            mEKeyDown = false;
+            mZKeyDown = false;
+            mXKeyDown = false;
+            mGraveKeyDown = false;
+            mSayField.setText( "/" );
+            mSayField.focus();
+            return;
+            }
+        if( KeybindManager::isActive( "openChat" ) ) {
+            mEKeyDown = false;
+            mZKeyDown = false;
+            mXKeyDown = false;
+            mGraveKeyDown = false;
+            mSayField.setText( "" );
+            mSayField.focus();
+            return;
+            }
         }
 
     if( mSayField.isFocused() ) {
@@ -28439,14 +28426,6 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                 vogPickerOn = ! vogPickerOn;
                 }
             break;
-        case 'n':
-            if( ! mSayField.isFocused() && !vogMode &&
-                !commandKey && !shiftKey ) {
-                alwaysShowPlayerLabelEnabled = !alwaysShowPlayerLabelEnabled;
-                SettingsManager::setSetting("alwaysShowPlayerLabelEnabled",
-                                            alwaysShowPlayerLabelEnabled);
-                }
-            break;
         case 'N':
             if( ! mSayField.isFocused() &&
                 serverSocketConnected &&
@@ -28477,15 +28456,12 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
         case 'X':
             if( userTwinCode != NULL &&
                 ! mStartedLoadingFirstObjectSet ) {
-                
+
                 closeSocket( mServerSocket );
                 mServerSocket = -1;
-                
+
                 setWaiting( false );
                 setSignal( "twinCancel" );
-                }
-            else if( ! mSayField.isFocused() ) {
-                mXKeyDown = true;
                 }
             break;
         /*
@@ -28544,47 +28520,19 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
             trailColors.deleteAll();
             break;
         */
-        case 'e':
-        case 'E':
-            if( ! mSayField.isFocused() ) {
-                mEKeyDown = true;
-                }
-            break;
-        case 'z':
-        case 'Z':
-            if( mUsingSteam && ! mSayField.isFocused() ) {
-                mZKeyDown = true;
-                }
-            break;
         case ' ':
-        if( ! mSayField.isFocused() && ! SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
+            if( !mSayField.isFocused() && !SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
                 shouldMoveCamera = false;
                 }
             break;
         case 'f':
         case 'F':
-            if( ! mSayField.isFocused() && SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
-                shouldMoveCamera = false;
-                }
             if( vogMode && !TextField::isAnyFocused() ) {
                 vogScrollingMode = !vogScrollingMode;
                 }
             break;
-        case 96: { // grave
-            if( !TextField::isAnyFocused() && !vogMode) {
-                mGraveKeyDown = true;
-                }
-            // gui_hud_mode = SettingsManager::getIntSetting( "hudDrawMode", 0 );
-            // gui_hud_mode = abs( ( gui_hud_mode + 1 ) % 3 );
-            // SettingsManager::setSetting( "hudDrawMode", gui_hud_mode );
-            // calcOffsetHUD();
-            }
-            break;
         // case 'k':
         case 'K':
-            if( !TextField::isAnyFocused() ) {
-                drawGridToggle = !drawGridToggle;
-                }
             break;
         case 9: // tab
             if( mCurrentHintObjectID != 0 ) {
@@ -28617,29 +28565,10 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                 }
             break;
         case '/':
-            if( ! mSayField.isFocused() ) {
-                mEKeyDown = false;
-                mZKeyDown = false;
-                mXKeyDown = false;
-                mGraveKeyDown = false;
-                
-                // start typing a filter
-                mSayField.setText( "/" );
-                mSayField.focus();
-                }
             break;
         case 13:  // enter
             // speak
-            if( ! TextField::isAnyFocused() ) {
-                mEKeyDown = false;
-                mZKeyDown = false;
-                mXKeyDown = false;
-                mGraveKeyDown = false;
-                
-                mSayField.setText( "" );
-                mSayField.focus();
-                }
-            else if( mSayField.isFocused() ) {
+            if( mSayField.isFocused() ) {
                 char *typedText = mSayField.getText();
                 
                 
@@ -29231,19 +29160,14 @@ void LivingLifePage::specialKeyDown( int inKeyCode ) {
             
 void LivingLifePage::keyUp( unsigned char inASCII ) {
 
-    bool commandKey = isCommandKeyDown();
-    bool shiftKey = isShiftKeyDown();
-
     dragging = false;
     dragStart = {9999, 9999};
     dragEnd = {9999, 9999};
 
-    // baseKeyMatches checks plain key, uppercase, and ctrl-code,
-    // so both the normal release and ctrl+key release are handled.
-    if( KeybindManager::baseKeyMatches( "moveUp",    inASCII ) ) upKeyDown    = false;
-    if( KeybindManager::baseKeyMatches( "moveLeft",  inASCII ) ) leftKeyDown  = false;
-    if( KeybindManager::baseKeyMatches( "moveDown",  inASCII ) ) downKeyDown  = false;
-    if( KeybindManager::baseKeyMatches( "moveRight", inASCII ) ) rightKeyDown = false;
+    if( KeybindManager::isReleased( "moveUp" ) ) upKeyDown = false;
+    if( KeybindManager::isReleased( "moveLeft" ) ) leftKeyDown = false;
+    if( KeybindManager::isReleased( "moveDown" ) ) downKeyDown = false;
+    if( KeybindManager::isReleased( "moveRight" ) ) rightKeyDown = false;
 
     if (!upKeyDown && !leftKeyDown && !downKeyDown && !rightKeyDown) {
         lastPosX = 9999;
@@ -29253,35 +29177,18 @@ void LivingLifePage::keyUp( unsigned char inASCII ) {
         magnetMoveCount = 0;
     }
 
-    if( runningYumFinder && !mSayField.isFocused() && !vogMode &&
-        KeybindManager::baseKeyMatches( "yumFinder", inASCII ) ) {
-        runningYumFinder = false;
-        }
 
-    switch( inASCII ) {
-        case 'e':
-        case 'E':
-            mEKeyDown = false;
-            break;
-        case 'z':
-        case 'Z':
-            mZKeyDown = false;
-            break;
-        case 'x':
-        case 'X':
-            mXKeyDown = false;
-            break;
-        case ' ':
-            if (! SettingsManager::getIntSetting( "keyboardActions", 1 )) shouldMoveCamera = true;
-            break;
-        case 'f':
-        case 'F':
-            if (SettingsManager::getIntSetting( "keyboardActions", 1 )) shouldMoveCamera = true;
-            break;
-        case 96: { // grave
-            mGraveKeyDown = false;
-            }
-            break;
+    if( KeybindManager::isReleased( "yumFinder" ) ) runningYumFinder = false;
+    if( KeybindManager::isReleased( "xray" ) ) mXKeyDown = false;
+    if( KeybindManager::isReleased( "hintBack" ) ) mZKeyDown = false;
+    if( KeybindManager::isReleased( "hideHud" ) ) mGraveKeyDown = false;
+    if( KeybindManager::isReleased( "heldUse" ) ) mEKeyDown = false;
+
+    if( !SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
+        if( inASCII == ' ' ) shouldMoveCamera = true;
+        }
+    else {
+        if( KeybindManager::isReleased( "stopCamera" ) ) shouldMoveCamera = true;
         }
 
     }

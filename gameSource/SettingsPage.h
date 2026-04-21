@@ -8,6 +8,7 @@
 #include "DropdownList.h"
 #include "Background.h"
 #include "KeybindInput.h"
+#include "KeybindGroup.h"
 #include "LinkedCheckbox.h"
 
 #include "minorGems/ui/event/ActionListener.h"
@@ -135,17 +136,16 @@ class SettingsPage : public GamePage, public ActionListener {
         
 
         // Keybinds
-         LinkedCheckbox mClothingFilter;
-        
-        // Allocated lazily on first visit to the KEYBINDS tab.
-        // Each entry is owned by this page and freed in the destructor.
+        LinkedCheckbox mClothingFilter;
+        KeybindGroup *mMovementGroup;
         SimpleVector<KeybindInput *> mKeybindInputs;
-
-        // Allocates one KeybindInput per registered action and adds them
-        // as components.  Called once, guarded by mKeybindInputs.size()==0.
         void buildKeybindWidgets();
+        
+        void setVisibleByTag( int inTag, char inVisible );
+        void positionByTag( int inTag, double inX, double inStartY, double inSpacing );
+
 
         void checkRestartButtonVisibility();
 
-        void setVisibleByTag( int inTag, char inVisible ); 
+
     };

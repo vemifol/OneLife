@@ -16,11 +16,14 @@
 #include "objectBank.h"
 #include "buttonStyle.h"
 
+#include "DevConsole.h"
+
 #ifdef USE_DISCORD
 #include "DiscordController.h"
 #endif // USE_DISCORD
 
 #include "DropdownList.h"
+#include "ComponentTag.h"
 
 extern Font * mainFont;
 
@@ -140,12 +143,11 @@ SettingsPage::SettingsPage()
         mEnableDangerousTileBox(0, -72, 4),
         mGenerateTownPlannerMapsBox( 561, 52, 4 ),
         mEnableShowingHeldFoodPips( 561, 52, 4 ),
-        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ) ,
+        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ),
         
         // Keybinds
-        mClothingFilter( mainFont, 0, 0, 4, LinkedCheckbox::single, alignRight, 4 )
-        {
-                            
+        mClothingFilter( mainFont, 0, 0, 4, LinkedCheckbox::single, alignRight, 4 ),
+        mMovementGroup( new KeybindGroup( mainFont, 0, 0, 1 ) ) {
 
     
     // Adding components below in reverse order so cursor tip is drawn on top
@@ -188,6 +190,10 @@ SettingsPage::SettingsPage()
     mClothingFilter.setLabel(1, "TOP");
     mClothingFilter.setLabel(2, "BOTTOM");
     mClothingFilter.setLabel(3, "BACK");
+
+    addComponent( mMovementGroup );
+    mMovementGroup->setVisible( false );
+
     
 #ifdef USE_DISCORD
     // Discord
@@ -534,6 +540,7 @@ SettingsPage::~SettingsPage() {
     clearSoundUsage( &mTestSound );
 
     delete mCursorModeSet;
+    delete mMovementGroup;
 
     for( int i = 0; i < mKeybindInputs.size(); i++ ) {
         delete mKeybindInputs.getElementDirect( i );
@@ -1019,36 +1026,6 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
                                     newSetting);
         }
 
-    // Check if a KeybindInput fired (binding committed or cleared).
-    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
-        if( inTarget == mKeybindInputs.getElementDirect( i ) ) {
-            KeybindInput *inp = mKeybindInputs.getElementDirect( i );
-            KeybindRecord *r = KeybindManager::findAction(
-                inp->getActionName() );
-            if( r != NULL && r->key != 0 ) {
-                const char *conflict =
-                    KeybindManager::findConflict( r->actionName,
-                                                  r->key,
-                                                  r->modifiers );
-                if( conflict != NULL ) {
-                    char *msg = autoSprintf(
-                        "CONFLICT WITH: %s", conflict );
-                    setStatusDirect( msg, true );
-                    delete [] msg;
-                    }
-                }
-            // KeybindManager is already updated and saved.
-            // LivingLifePage::makeActive calls KeybindManager::loadAll()
-            // the next time the player enters the game.
-            break;
-            }
-        }
-
-    if( inTarget == &mClothingFilter ) {
-        updatePage();
-        return;
-        }
-
     checkRestartRequired();
     updatePage();
     }
@@ -1530,8 +1507,6 @@ void SettingsPage::updatePage() {
     mGenerateTownPlannerMapsBox.setPosition(0, lineSpacing * -3);
     mEnableShowingHeldFoodPips.setPosition(0, lineSpacing * -4);
     mEnableAlwaysShowPlayerLabelsBox.setPosition(0, lineSpacing * -5);
-
-    mClothingFilter.setStartPosition( 32 - 16, lineSpacing * 5);
     
     mEnableFOVBox.setVisible( mPage == 0 );
     mEnableCenterCameraBox.setVisible( mPage == 0 );
@@ -1586,20 +1561,37 @@ void SettingsPage::updatePage() {
     mEnableShowingHeldFoodPips.setVisible(mPage == 5);
     mEnableAlwaysShowPlayerLabelsBox.setVisible(mPage == 5);
 
-    mClothingFilter.setVisible(mPage == 6);
+
 
     for( int i = 0; i < mKeybindInputs.size(); i++ ) {
-        mKeybindInputs.getElementDirect( i )->setVisible( false );
+        KeybindInput *p = mKeybindInputs.getElementDirect( i );
+        p->setVisible( false );
         }
+    
+    setVisibleByTag( TAG_MOVE, mPage == 6 );
+    setVisibleByTag ( TAG_MOVE_MODIFIER, mPage == 6 );
+
+    mClothingFilter.setVisible( mPage == 6 );
+    mMovementGroup->setVisible( mPage == 6 );
+
 
     if( mPage == 6 ) {
-        double inputX = 100;
+        double inputX = 140;
         double startY = 264;
 
+        int clothingSelected = 0;
         for( int i = 0; i < mClothingFilter.getNumOptions(); i++ ) {
-            setVisibleByTag( (1 << i), mClothingFilter.isChecked(i) );
+            int tag = (1 << i);
+            setVisibleByTag( tag, mClothingFilter.isChecked( i ) );
+            if( mClothingFilter.isChecked( i ) ) {
+                clothingSelected = tag;
+                }
             }
-    }
+        positionByTag( clothingSelected, inputX, startY, lineSpacing );
+        }
+
+
+
     mGameplayButton.setActive( mPage != 0 );
     mControlButton.setActive( mPage != 1 );
     mScreenButton.setActive( mPage != 2 );
@@ -1615,25 +1607,92 @@ void SettingsPage::updatePage() {
 
 
 void SettingsPage::buildKeybindWidgets() {
-    if( mKeybindInputs.size() > 0 ) {
-        return;
-        }
+    if( mKeybindInputs.size() > 0 ) return;
 
     int numActions = KeybindManager::getActionCount();
-    if( numActions == 0 ) {
-        return;
-        }
+    if( numActions == 0 ) return;
+
+    cprintf( "reset %f\n", mainFont->measureString( "RESET" ) );
+    cprintf( "SHIFT %f\n", mainFont->measureString( "SHIFT" ) );
 
     for( int i = 0; i < numActions; i++ ) {
         KeybindRecord *r = KeybindManager::getAction( i );
-        char *name = r->actionName;
-        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 4, name );
-        inp->setTags(r->tags);
+        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 0, r->actionName );
+        inp->setTags( r->tags );
         inp->setLabelText( r->displayLabel );
-        inp->setVisible( false );
-        inp->addActionListener( this );
-        addComponent( inp );
+        double width = 241;
+
+    
+        /*
+        getFontHeight() = charWidth × scale = 32
+        spacing = (N-1) * mCharSpacing ( 3 for main font )
+        lineSpacing = 52 ( +4 )
+
+        1 -> 32 + (1 - 1) + 16 = 48
+        2 -> 32*2 + (2 - 1) + 16 = 83
+        3 -> 32*3 + (3 - 1) + 16 = 118
+        
+        "W" = 21 -> 32 - 21 = 11 spacing
+        "SHIFT" = 62 + 27 = 89
+        "RESET" = 70
+
+        1 key = 48
+        Max keybind length: "CTRL+SHIFT+SPACE" = 214 + 11 + 16  = 241
+        Min length: "[NONE]" = 81 + 11 + 16 = 108
+        Min length: "[ ]" / "[]" = 24 / 17
+        
+        "RESET" = 70
+
+
+        */
+
+
+        if ( r->modifierOnly ) {
+            width = 108;
+        }
+        else if ( r->keyOnly ) {
+            width = 48;
+        }
+
+        
+
+        inp->setWidth ( width );
         mKeybindInputs.push_back( inp );
+        addComponent( inp );
+        if ( r->tags & TAG_MOVE ) {
+            if ( strcmp( r->actionName, "moveUp" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 );
+                }
+            if ( strcmp( r->actionName, "moveDown" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "moveRight" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190 + 52, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "moveLeft" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190 - 52, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "alphaBelow" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 - 52 - 55 );
+                inp->setWidth ( 48*3 + 4*2 );
+                }
+            inp->addActionListener( mMovementGroup );
+            }
+        
+            if ( strcmp( r->actionName, "alphaModifier" ) == 0 ) {
+                inp->setPosition ( 70, -40 );
+                }
+            if ( strcmp( r->actionName, "alphaToggle" ) == 0 ) {
+                inp->setPosition ( 380, -40 );
+                }
+            if ( strcmp( r->actionName, "betaModifier" ) == 0 ) {
+                inp->setPosition ( 70, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "betaToggle" ) == 0 ) {
+                inp->setPosition ( 380, -40 - 52 );
+                }
+        inp->addActionListener( this );
+
         }
     }
 
@@ -1660,6 +1719,19 @@ void SettingsPage::setVisibleByTag( int inTag, char inVisible ) {
         PageComponent *c = *mComponents.getElement(i);
         if( c->getTags() & inTag ) {
             c->setVisible( inVisible );
+            }
+        }
+    }
+
+
+void SettingsPage::positionByTag( int inTag, double inX,
+                                          double inStartY, double inSpacing ) {
+    int index = 0;
+    for( int i = 0; i < mComponents.size(); i++ ) {
+        PageComponent *c = *mComponents.getElement( i );
+        if( c->getTags() & inTag ) {
+            c->setPosition( inX, inStartY - inSpacing * index );
+            index++;
             }
         }
     }

@@ -796,6 +796,8 @@ void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
     //testPage = new TestPage;
     //currentGamePage = testPage;
 
+    
+
     currentGamePage->base_makeActive( true );
 
     initDone = true;
@@ -3022,7 +3024,13 @@ char *getConsolePendingInput() {
 
 
 void keyDown( unsigned char inASCII ) {
+    KeybindManager::keyDown( inASCII );
     
+    if( KeybindInput::getListening() != NULL && inASCII == 27 ) { // Prevent closing page if a keybind input is listening
+        KeybindInput::getListening()->unfocus();
+        return;
+        }
+
     if( inASCII == 27 ) { // ESCAPE KEY
         TextField::unfocusAll();
         if ( currentGamePage == settingsPage ) {
@@ -3039,11 +3047,7 @@ void keyDown( unsigned char inASCII ) {
 
     // toggle dev console — works from any screen
     {
-    char altKey    = isAltKeyDown();
-    char shiftKey  = isShiftKeyDown();
-    char commandKey = isCommandKeyDown() && !altKey;
-    if( KeybindManager::isPressed( "toggleConsole", inASCII,
-                                   shiftKey, commandKey, altKey ) ) {
+    if( KeybindManager::isActive( "toggleConsole" ) ) {
         if( isCustomConsoleOpen() ) {
             closeCustomConsole();
             }
@@ -3141,6 +3145,8 @@ void keyUp( unsigned char inASCII ) {
         // even if pause screen no longer up, pay attention to this
         holdDeleteKeySteps = -1;
         }
+    
+    KeybindManager::keyUp( inASCII );
 
     if( isPaused() ) return;
 
@@ -3157,10 +3163,12 @@ void keyUp( unsigned char inASCII ) {
 
 
 void specialKeyDown( int inKey ) {
+    KeybindManager::specialKeyDown( inKey );
+
     if( isPaused() ) {
         return;
         }
-    
+
     if( currentGamePage != NULL ) {
         currentGamePage->base_specialKeyDown( inKey );
         }
@@ -3169,6 +3177,8 @@ void specialKeyDown( int inKey ) {
 
 
 void specialKeyUp( int inKey ) {
+    KeybindManager::specialKeyUp( inKey );
+
     if( isPaused() ) {
         return;
         }

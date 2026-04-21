@@ -1,54 +1,57 @@
-/*
- * KeybindInput.cpp
- */
-
 #include "KeybindInput.h"
 
 #include "minorGems/util/stringUtils.h"
 #include "minorGems/game/game.h"
 #include "minorGems/game/gameGraphics.h"
 #include "minorGems/game/drawUtils.h"
-#include "minorGems/graphics/openGL/KeyboardHandlerGL.h"
+
+#include "DevConsole.h"
+#include "minorGems/game/game.h"
+
 
 #include <string.h>
 #include <ctype.h>
 
 
-KeybindInput::KeybindInput( Font *inFont,
-                             double inX, double inY,
-                             int inCharsWide,
-                             const char *inActionName )
-        : TextField( inFont, inX, inY, inCharsWide,
-                     false,   // forceCaps — buildDisplayString handles case
-                     NULL,    // no built-in label; SettingsPage sets it
-                     NULL,    // allowedChars — we intercept all input
-                     NULL ),  // forbiddenChars
-          mActionName( stringDuplicate( inActionName ) ),
-          mListening( false ) {
+KeybindInput *KeybindInput::sListening = NULL;
+
+
+KeybindInput::KeybindInput( Font *inFont, double inX, double inY, int inCharsWide, const char *inActionName )
+        : TextField( inFont, inX, inY, inCharsWide, false, NULL, NULL, NULL ),
+          mActionName( stringDuplicate( inActionName ) ) {
+
+    mClearButton = new TextButton( inFont, mWide / 2 + 30, 0, "X" );
+    mResetButton = new SpriteButton( "resetButton.tga", mWide / 2 + 80, 0, 0.1875);
+    mResetButton->setSize( mHigh, mHigh );
+    mResetButton->setPixelSize( inFont->getFontHeight() / 8 );
+
+    mClearButton->setSize( mHigh, mHigh );
+
+    mClearButton->setDisabledFontColor( 150/255.0f, 150/255.0f, 150/255.0f, 1 );
+
+    mClearButton->addActionListener( this );
+    mResetButton->addActionListener( this );
+
+    addComponent( mClearButton );
+    addComponent( mResetButton );
+
     setIgnoreArrowKeys( true );
-    refreshDisplay();
+
+    mRecord = KeybindManager::findAction ( mActionName );
+
+
+    mResetEnabledSprite = loadSprite( "resetButton.tga" );
+    mResetDisabledSprite = loadSprite( "resetButtonDisabled.tga" );
+
+    setShowClearButton( false );
+    refreshText();
     }
 
 
 KeybindInput::~KeybindInput() {
     delete [] mActionName;
-    }
-
-
-void KeybindInput::refreshDisplay() {
-    KeybindRecord *r = KeybindManager::findAction( mActionName );
-    if( r == NULL || r->key == 0 ) {
-        setText( "[NONE]" );
-        return;
-        }
-    char buf[KEYBIND_DISPLAY_MAX];
-    KeybindManager::buildDisplayString( r->key, r->modifiers, buf );
-    setText( buf );
-    }
-
-
-char KeybindInput::isListening() {
-    return mListening;
+    freeSprite( mResetEnabledSprite );
+    freeSprite( mResetDisabledSprite );
     }
 
 
@@ -57,144 +60,185 @@ const char *KeybindInput::getActionName() {
     }
 
 
+KeybindInput *KeybindInput::getListening() {
+    return sListening;
+    }
+
+
+void KeybindInput::refreshText() {
+    char isNone = mRecord->key == 0 && mRecord->modifiers == KEYBIND_MOD_NONE;
+    unsigned char defaultKey;
+    int defaultMods;
+    KeybindManager::parseKeyString( mRecord->defaultKeyStr, &defaultKey, &defaultMods );
+    char isDefault = mRecord->key == defaultKey && mRecord->modifiers == defaultMods;
+    mClearButton->setDisabled( isNone );
+    mClearButton->setIgnoreEvents( isNone );
+    mResetButton->setDisabled( isDefault );
+    mResetButton->setIgnoreEvents( isDefault );
+
+    if ( isDefault ) {
+        mResetButton->setSprite( mResetDisabledSprite, false );
+        }
+    else {
+        mResetButton->setSprite( mResetEnabledSprite, false );
+        }
+
+    if( mRecord->key == 0 && mRecord->modifiers == KEYBIND_MOD_NONE ) {
+        if( mRecord->keyOnly ) setText( "[ ]" );
+        else setText( "[NONE]" );
+        return;
+        }
+    char *text = KeybindManager::buildKeyString( mActionName, true );
+    setText( text );
+    delete [] text;
+    }
+
+
+void KeybindInput::setShowClearButton( char inShow ) {
+    mClearButton->setVisible( inShow );
+    mClearButton->setIgnoreEvents( !inShow );
+    if( !inShow ) mResetButton->setPosition( mWide / 2 + 30, 0 );
+    }
+
+void KeybindInput::setShowResetButton( char inShow ) {
+    mResetButton->setVisible( inShow );
+    mResetButton->setIgnoreEvents( !inShow );
+    }
+
+
+void KeybindInput::setWidth( double inWide ) {
+    TextField::setWidth( inWide );
+    mClearButton->setPosition( mWide / 2 + 30, 0 );
+    if( mClearButton->isVisible() ) mResetButton->setPosition( mWide / 2 + 80, 0 );
+    else mResetButton->setPosition( mWide / 2 + 30, 0 );
+    }
+
 void KeybindInput::focus() {
+    sListening = this;
     TextField::focus();
-    startListening();
     }
 
 
 void KeybindInput::unfocus() {
-    stopListening();
+    if( sListening == this ) sListening = NULL;
+    refreshText();
     TextField::unfocus();
     }
 
 
-void KeybindInput::startListening() {
-    mListening = true;
-    }
-
-
-void KeybindInput::stopListening() {
-    if( !mListening ) {
-        return;
-        }
-    mListening = false;
-    refreshDisplay();
-    }
-
-
 void KeybindInput::pointerUp( float inX, float inY ) {
-    if( isInside( inX, inY ) ) {
-        focus();
-        }
-    else {
-        unfocus();
-        }
+    if( isInside( inX, inY ) ) focus();
+    else unfocus();
     }
 
 
 void KeybindInput::keyDown( unsigned char inASCII ) {
-    if( !mFocused || !mListening ) {
-        return;
-        }
+    if( !mFocused ) return;
 
-    // ESC — cancel without changing anything
-    if( inASCII == 27 ) {
+    // Backspace clears regardless of modifier-only
+    if( inASCII == 8 ) {
+        KeybindManager::clearToNone( mActionName );
         unfocus();
-        return;
-        }
-
-    // Delete (127) or Backspace (8) — clear the binding
-    if( inASCII == 127 || inASCII == 8 ) {
-        KeybindManager::setBinding( mActionName, 0, KEYBIND_MOD_NONE );
-        KeybindManager::saveAction( mActionName );
-        stopListening();
-        TextField::unfocus();
         fireActionPerformed( this );
         return;
         }
 
-    // Build modifier flags from current physical key state
-    int mods = KEYBIND_MOD_NONE;
-    if( isShiftKeyDown() ) mods |= KEYBIND_MOD_SHIFT;
-    if( isControlKeyDown() ) mods |= KEYBIND_MOD_CTRL;
-    if( isAltKeyDown() ) mods |= KEYBIND_MOD_ALT;
-    if( isCapsLockDown() ) mods |= KEYBIND_MOD_CAPS;
+    if( mRecord->modifierOnly ) return;
 
-    // Recover base key from ctrl-code.
-    // ctrl+A arrives as ASCII 1, ctrl+B as 2, ..., ctrl+Z as 26.
-    // ASCII 30 = forward mouse button, ASCII 31 = back mouse button —
-    // treat them as primary keys directly, no ctrl-code conversion.
-    unsigned char baseKey;
-    if( inASCII == 30 || inASCII == 31 ) {
-        baseKey = inASCII;
+    int mods = KEYBIND_MOD_NONE;
+    if( KeybindManager::isShiftDown() ) mods |= KEYBIND_MOD_SHIFT;
+    if( KeybindManager::isControlDown() ) mods |= KEYBIND_MOD_CTRL;
+    if( KeybindManager::isAltDown() ) mods |= KEYBIND_MOD_ALT;
+
+    // Enter without ctrl maps to slot 28 (avoids Ctrl+M collision)
+    if( inASCII == 13 && !KeybindManager::isControlDown() ) {
+        KeybindManager::setBinding( mActionName, 28, mRecord->keyOnly ? KEYBIND_MOD_NONE : mods );
+        KeybindManager::saveAction( mActionName );
+        unfocus();
+        fireActionPerformed( this );
+        return;
         }
-    else if( inASCII > 0 && inASCII < 27 ) {
+
+    // Recover base key from ctrl code
+    unsigned char baseKey;
+    if( inASCII > 0 && inASCII < 27 ) {
         baseKey = 'a' + inASCII - 1;
-        mods |= KEYBIND_MOD_CTRL;
+        if( !mRecord->keyOnly ) mods |= KEYBIND_MOD_CTRL;
         }
     else {
         baseKey = (unsigned char)tolower( inASCII );
         }
 
+    if( mRecord->keyOnly ) mods = KEYBIND_MOD_NONE;
+
     KeybindManager::setBinding( mActionName, baseKey, mods );
     KeybindManager::saveAction( mActionName );
-    stopListening();
-    TextField::unfocus();
+    unfocus();
     fireActionPerformed( this );
     }
 
 
 void KeybindInput::specialKeyDown( int inKeyCode ) {
-    // Special keys (F-keys, arrow keys) are not supported as primary keys
-    // in this iteration.  We only cancel listening to avoid getting stuck.
-    // ESC arrives as ASCII 27 in keyDown(), not here.
-    if( !mFocused || !mListening ) {
-        return;
+    if( !mFocused || !mRecord->modifierOnly ) return;
+
+    int mods = KEYBIND_MOD_NONE;
+    if( KeybindManager::isShiftDown() ) mods |= KEYBIND_MOD_SHIFT;
+    if( KeybindManager::isControlDown() ) mods |= KEYBIND_MOD_CTRL;
+    if( KeybindManager::isAltDown() ) mods |= KEYBIND_MOD_ALT;
+    if( mods == KEYBIND_MOD_NONE ) return;
+
+    KeybindManager::setBinding( mActionName, 0, mods );
+    KeybindManager::saveAction( mActionName );
+    unfocus();
+    fireActionPerformed( this );
+    }
+
+
+void KeybindInput::actionPerformed( GUIComponent *inTarget ) {
+    if( inTarget == mClearButton ) {
+        KeybindManager::clearToNone( mActionName );
+        refreshText();
+        fireActionPerformed( this );
         }
-    // Do nothing — user must press a normal key or ESC to exit.
+    else if( inTarget == mResetButton ) {
+        KeybindManager::resetToDefault( mActionName );
+        refreshText();
+        fireActionPerformed( this );
+        }
     }
 
 
 void KeybindInput::draw() {
-    // Draw border — white when listening, grey otherwise
-    if( mListening ) {
-        setDrawColor( 1, 1, 1, 1 );
-        }
+
+    if( mFocused ) setDrawColor( 1, 1, 1, 1 );
     else {
-        setDrawColor( 0.5, 0.5, 0.5, 1 );
+        if( mHover ) setDrawColor( 0.75, 0.75, 0.75, 1 );
+        else setDrawColor( 0.5, 0.5, 0.5, 1 );
         }
 
-    drawRect( - mWide / 2, - mHigh / 2,
-              mWide / 2, mHigh / 2 );
+    drawRect( -mWide / 2, -mHigh / 2, mWide / 2, mHigh / 2 );
 
     double pixWidth = mCharWidth / 8;
 
-    double rectStartX = - mWide / 2 + pixWidth;
-    double rectStartY = - mHigh / 2 + pixWidth;
+    double rectStartX = -mWide / 2 + pixWidth;
+    double rectStartY = -mHigh / 2 + pixWidth;
     double rectEndX = mWide / 2 - pixWidth;
     double rectEndY = mHigh / 2 - pixWidth;
 
     setDrawColor( 0.25, 0.25, 0.25, 1 );
     drawRect( rectStartX, rectStartY, rectEndX, rectEndY );
 
-    // Draw label to the left
     if( mLabelText != NULL ) {
-        double xPos = mWide / 2 + mBorderWide;
+        double xPos = -mWide / 2 - mBorderWide;
         doublePair labelPos = { xPos, 0 };
+        doublePair shadowOffset = { -2, 2 };
+        setDrawColor( 0, 0, 0, 1 );
+        mFont->drawString( mLabelText, add( labelPos, shadowOffset ), alignRight );
         setDrawColor( 1, 1, 1, 1 );
-        mFont->drawString( mLabelText, labelPos, alignLeft );
+        mFont->drawString( mLabelText, labelPos, alignRight );
         }
 
-    // Draw text — left-aligned from border, no scroll, no caret, no fade
     setDrawColor( 1, 1, 1, 1 );
-    doublePair textPos = { - mWide / 2 + mBorderWide, 0 };
-    mFont->drawString( mText, textPos, alignLeft );
-
-    // Inactive overlay
-    if( !mActive ) {
-        setDrawColor( 0, 0, 0, 0.5 );
-        drawRect( - mWide / 2, - mHigh / 2,
-                    mWide / 2,   mHigh / 2 );
-        }
+    doublePair bindTextPos = { 0, 0 };
+    mFont->drawString( mText, bindTextPos, alignCenter );
     }

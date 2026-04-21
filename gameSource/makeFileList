@@ -57,6 +57,7 @@ musicPlayer2.cpp \
 groundSprites.cpp \
 KeybindManager.cpp \
 KeybindInput.cpp \
+KeybindGroup.cpp \
 SettingsPage.cpp \
 CheckboxButton.cpp \
 LinkedCheckbox.cpp \

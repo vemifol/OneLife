@@ -6,7 +6,6 @@
 *~
 *.orig
 Makefile*
-*.tga
 
 callgrind.out*
 leak.out*
