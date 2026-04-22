@@ -4,7 +4,7 @@
 #include "minorGems/game/Font.h"
 #include "minorGems/ui/event/ActionListener.h"
 #include "KeybindManager.h"
-#include "Keybindinput.h"
+#include "KeybindInput.h"
 #include "PageComponent.h"
 
 class KeybindGroup : public PageComponent, public ActionListener  {

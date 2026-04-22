@@ -60,13 +60,13 @@ void KeybindGroup::addLabel( const char *inLabelText, doublePair inLabelPos, Tex
 void KeybindGroup::actionPerformed( GUIComponent *inTarget ) {
     if( inTarget == mResetButton ) {
         for( int i = 0; i < mInputs.size(); i++ ) {
-            KeybindManager::resetToDefault( mInputs.getElementDirect( i )->getActionName() );
+            KeybindManager::resetBinding( mInputs.getElementDirect( i )->getActionName() );
             mInputs.getElementDirect( i )->refreshText();
             }
         }
     if( inTarget == mClearButton ) {
         for( int i = 0; i < mInputs.size(); i++ ) {
-            KeybindManager::clearToNone( mInputs.getElementDirect( i )->getActionName() );
+            KeybindManager::clearBinding( mInputs.getElementDirect( i )->getActionName() );
             mInputs.getElementDirect( i )->refreshText();
             }
         }

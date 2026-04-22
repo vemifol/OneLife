@@ -4264,7 +4264,6 @@ void LivingLifePage::clearMap() {
     }
 
 
-
 LivingLifePage::LivingLifePage() 
         : mServerSocket( -1 ), 
           mForceRunTutorial( false ),
@@ -4340,81 +4339,69 @@ LivingLifePage::LivingLifePage()
     if( SettingsManager::getIntSetting( "familyDisplayEnabled", 0 ) ) {
         familyDisplayEnabled = true;
         }
-    // Register all keybind actions once, then load from disk.
-    // The static guard ensures this only runs on the very first makeActive.
-    static char keybindsRegistered = false;
-    if( !keybindsRegistered ) {
-        keybindsRegistered = true;
-  
-        KeybindManager::registerAction( "moveUp", "UP", "w", TAG_MOVE, KEY_ONLY );
-        KeybindManager::registerAction( "moveLeft", "LEFT", "a", TAG_MOVE, KEY_ONLY );
-        KeybindManager::registerAction( "moveDown", "DOWN", "s", TAG_MOVE, KEY_ONLY );
-        KeybindManager::registerAction( "moveRight", "RIGHT", "d", TAG_MOVE, KEY_ONLY );
-        KeybindManager::registerAction( "alphaBelow", "BELOW", "space", TAG_MOVE, KEY_ONLY );
+    // Register all keybind actions and load bindings from disk once on startup.
+    KeybindManager::registerAction( "moveUp", "UP", "w", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveLeft", "LEFT", "a", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveDown", "DOWN", "s", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveRight", "RIGHT", "d", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "alphaBelow", "BELOW", "space", TAG_MOVE, KEY_ONLY );
 
-        KeybindManager::registerAction( "alphaModifier", "ALPHA", "shift", TAG_MOVE_MODIFIER, MODIFIER_ONLY);
-        KeybindManager::registerAction( "betaModifier", "BETA", "ctrl", TAG_MOVE_MODIFIER, MODIFIER_ONLY);
-        KeybindManager::registerAction( "alphaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
-        KeybindManager::registerAction( "betaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
+    KeybindManager::registerAction( "alphaModifier", "ALPHA", "shift", TAG_MOVE_MODIFIER, MODIFIER_ONLY );
+    KeybindManager::registerAction( "betaModifier", "BETA", "ctrl", TAG_MOVE_MODIFIER, MODIFIER_ONLY );
+    KeybindManager::registerAction( "alphaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
+    KeybindManager::registerAction( "betaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
 
-        // Clothes
-        KeybindManager::registerAction( "useHat", "USE", "ctrl+t", TAG_HAT );
-        KeybindManager::registerAction( "useHatReplace", "REPLACE", "ctrl+shift+t", TAG_HAT );
-        KeybindManager::registerAction( "useHatRemv", "REMV", "", TAG_HAT );
+    // Clothes
+    KeybindManager::registerAction( "useHat", "USE", "ctrl+t", TAG_HAT );
+    KeybindManager::registerAction( "useHatReplace", "REPLACE", "ctrl+shift+t", TAG_HAT );
+    KeybindManager::registerAction( "useHatRemv", "REMV", "", TAG_HAT );
 
-        KeybindManager::registerAction( "useTop", "USE", "shift+t", TAG_TOP );
-        KeybindManager::registerAction( "useTopReplace", "REPLACE", "", TAG_TOP );
-        KeybindManager::registerAction( "useTopRemv", "REMV", "", TAG_TOP );
+    KeybindManager::registerAction( "useTop", "USE", "shift+t", TAG_TOP );
+    KeybindManager::registerAction( "useTopReplace", "REPLACE", "", TAG_TOP );
+    KeybindManager::registerAction( "useTopRemv", "REMV", "", TAG_TOP );
 
-        KeybindManager::registerAction( "useBottom", "USE", "t", TAG_BOTTOM );
-        KeybindManager::registerAction( "useBottomReplace", "REPLACE", "", TAG_BOTTOM );
-        KeybindManager::registerAction( "useBottomRemv", "REMV", "", TAG_BOTTOM );
+    KeybindManager::registerAction( "useBottom", "USE", "t", TAG_BOTTOM );
+    KeybindManager::registerAction( "useBottomReplace", "REPLACE", "", TAG_BOTTOM );
+    KeybindManager::registerAction( "useBottomRemv", "REMV", "", TAG_BOTTOM );
 
-        KeybindManager::registerAction( "useBackpack", "USE", "q", TAG_BACK );
-        KeybindManager::registerAction( "useBackpackReplace", "REPLACE", "shift+q", TAG_BACK );
+    KeybindManager::registerAction( "useBackpack", "USE", "q", TAG_BACK );
+    KeybindManager::registerAction( "useBackpackReplace", "REPLACE", "shift+q", TAG_BACK );
 
-        KeybindManager::registerAction( "selfBackpackTransRemv", "TRANS/REMV", "b", TAG_BACK );
-        KeybindManager::registerAction( "selfBackpackTrans", "TRANS", "shift+b", TAG_BACK );
-        KeybindManager::registerAction( "selfBackpackRemv", "REMV", "ctrl+b", TAG_BACK );
+    KeybindManager::registerAction( "selfBackpackTransRemv", "TRANS/REMV", "b", TAG_BACK );
+    KeybindManager::registerAction( "selfBackpackTrans", "TRANS", "shift+b", TAG_BACK );
+    KeybindManager::registerAction( "selfBackpackRemv", "REMV", "ctrl+b", TAG_BACK );
 
-        KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e", 0, KEY_ONLY );
-        KeybindManager::registerAction( "removeClothing", "REMOVE CLOTHING", "shift+e" );
-        KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c", 0, KEY_ONLY );
+    KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e", 0, KEY_ONLY );
+    KeybindManager::registerAction( "removeClothing", "REMOVE CLOTHING", "shift+e" );
+    KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c", 0, KEY_ONLY );
 
-
-        // Clothing search 
-        for( int i = 0; i < sNumClothingSearchBinds; i++ ) {
-            KeybindManager::registerAction(
-                sClothingSearchBinds[i].actionName,
-                sClothingSearchBinds[i].displayLabel,
-                sClothingSearchBinds[i].defaultKey );
-            }
-
-        // Panel toggles
-        KeybindManager::registerAction( "toggleConsole", "TOGGLE DEV CONSOLE", "alt+c" );
-        KeybindManager::registerAction( "coordinatesToggle", "COORDINATES PANEL", "g", 0, KEY_ONLY );
-        KeybindManager::registerAction( "yumFinder", "YUM FINDER", "y", 0, KEY_ONLY );
-        KeybindManager::registerAction( "objectSearchToggle", "OBJECT SEARCH PANEL", "j", 0, KEY_ONLY );
-        KeybindManager::registerAction( "familyDisplayToggle", "FAMILY DISPLAY PANEL", "p", 0, KEY_ONLY );
-
-        // View toggles
-        KeybindManager::registerAction( "xray", "X-RAY MODE", "x", 0, KEY_ONLY );
-        KeybindManager::registerAction( "hideHud", "HIDE HUD", "`", 0, KEY_ONLY );
-        KeybindManager::registerAction( "hintBack", "HINT BACK", "z", 0, KEY_ONLY );
-        KeybindManager::registerAction( "nameLabels", "PLAYER NAMES", "n", 0, KEY_ONLY );
-        KeybindManager::registerAction( "heldUse", "HELD USE", "e", 0, KEY_ONLY );
-        KeybindManager::registerAction( "stopCamera", "STOP CAMERA", "f", 0, KEY_ONLY );
-        KeybindManager::registerAction( "gridToggle", "GRID TOGGLE", "shift+k" );
-        KeybindManager::registerAction( "sayCommand", "SAY COMMAND", "/" );
-        KeybindManager::registerAction( "openChat", "OPEN CHAT", "enter", 0, KEY_ONLY );
-
-        KeybindManager::init();
+    // Clothing search
+    for( int i = 0; i < sNumClothingSearchBinds; i++ ) {
+        KeybindManager::registerAction(
+            sClothingSearchBinds[i].actionName,
+            sClothingSearchBinds[i].displayLabel,
+            sClothingSearchBinds[i].defaultKey );
         }
-    else {
-        // Reload from disk each time the player enters the game
-        // (e.g. after changing bindings in the Settings page).
-        KeybindManager::loadAll();
-        }
+
+    // Panel toggles
+    KeybindManager::registerAction( "toggleConsole", "TOGGLE DEV CONSOLE", "alt+c" );
+    KeybindManager::registerAction( "coordinatesToggle", "COORDINATES PANEL", "g", 0, KEY_ONLY );
+    KeybindManager::registerAction( "yumFinder", "YUM FINDER", "y", 0, KEY_ONLY );
+    KeybindManager::registerAction( "objectSearchToggle", "OBJECT SEARCH PANEL", "j", 0, KEY_ONLY );
+    KeybindManager::registerAction( "familyDisplayToggle", "FAMILY DISPLAY PANEL", "p", 0, KEY_ONLY );
+
+    // View toggles
+    KeybindManager::registerAction( "xray", "X-RAY MODE", "x", 0, KEY_ONLY );
+    KeybindManager::registerAction( "hideHud", "HIDE HUD", "`", 0, KEY_ONLY );
+    KeybindManager::registerAction( "hintBack", "HINT BACK", "z", 0, KEY_ONLY );
+    KeybindManager::registerAction( "nameLabels", "PLAYER NAMES", "n", 0, KEY_ONLY );
+    KeybindManager::registerAction( "heldUse", "HELD USE", "e", 0, KEY_ONLY );
+    KeybindManager::registerAction( "stopCamera", "STOP CAMERA", "f", 0, KEY_ONLY );
+    KeybindManager::registerAction( "gridToggle", "GRID TOGGLE", "shift+k" );
+    KeybindManager::registerAction( "sayCommand", "SAY COMMAND", "/" );
+    KeybindManager::registerAction( "openChat", "OPEN CHAT", "enter", 0, KEY_ONLY );
+
+    KeybindManager::init();
 
     updateObjectSearchArray();
 

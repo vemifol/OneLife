@@ -26,7 +26,6 @@ KeybindInput::KeybindInput( Font *inFont, double inX, double inY, int inCharsWid
     mResetButton->setPixelSize( inFont->getFontHeight() / 8 );
 
     mClearButton->setSize( mHigh, mHigh );
-
     mClearButton->setDisabledFontColor( 150/255.0f, 150/255.0f, 150/255.0f, 1 );
 
     mClearButton->addActionListener( this );
@@ -135,9 +134,8 @@ void KeybindInput::pointerUp( float inX, float inY ) {
 void KeybindInput::keyDown( unsigned char inASCII ) {
     if( !mFocused ) return;
 
-    // Backspace clears regardless of modifier-only
     if( inASCII == 8 ) {
-        KeybindManager::clearToNone( mActionName );
+        KeybindManager::clearBinding( mActionName );
         unfocus();
         fireActionPerformed( this );
         return;
@@ -150,16 +148,14 @@ void KeybindInput::keyDown( unsigned char inASCII ) {
     if( KeybindManager::isControlDown() ) mods |= KEYBIND_MOD_CTRL;
     if( KeybindManager::isAltDown() ) mods |= KEYBIND_MOD_ALT;
 
-    // Enter without ctrl maps to slot 28 (avoids Ctrl+M collision)
-    if( inASCII == 13 && !KeybindManager::isControlDown() ) {
+    if( inASCII == 13 && !KeybindManager::isControlDown() ) { // re route enter to ASCII 28 for now. Checks for ctrl to avoid conflict with ctrl+m
         KeybindManager::setBinding( mActionName, 28, mRecord->keyOnly ? KEYBIND_MOD_NONE : mods );
-        KeybindManager::saveAction( mActionName );
+        KeybindManager::saveBinding( mActionName );
         unfocus();
         fireActionPerformed( this );
         return;
         }
 
-    // Recover base key from ctrl code
     unsigned char baseKey;
     if( inASCII > 0 && inASCII < 27 ) {
         baseKey = 'a' + inASCII - 1;
@@ -172,7 +168,7 @@ void KeybindInput::keyDown( unsigned char inASCII ) {
     if( mRecord->keyOnly ) mods = KEYBIND_MOD_NONE;
 
     KeybindManager::setBinding( mActionName, baseKey, mods );
-    KeybindManager::saveAction( mActionName );
+    KeybindManager::saveBinding( mActionName );
     unfocus();
     fireActionPerformed( this );
     }
@@ -188,7 +184,7 @@ void KeybindInput::specialKeyDown( int inKeyCode ) {
     if( mods == KEYBIND_MOD_NONE ) return;
 
     KeybindManager::setBinding( mActionName, 0, mods );
-    KeybindManager::saveAction( mActionName );
+    KeybindManager::saveBinding( mActionName );
     unfocus();
     fireActionPerformed( this );
     }
@@ -196,12 +192,12 @@ void KeybindInput::specialKeyDown( int inKeyCode ) {
 
 void KeybindInput::actionPerformed( GUIComponent *inTarget ) {
     if( inTarget == mClearButton ) {
-        KeybindManager::clearToNone( mActionName );
+        KeybindManager::clearBinding( mActionName );
         refreshText();
         fireActionPerformed( this );
         }
     else if( inTarget == mResetButton ) {
-        KeybindManager::resetToDefault( mActionName );
+        KeybindManager::resetBinding( mActionName );
         refreshText();
         fireActionPerformed( this );
         }

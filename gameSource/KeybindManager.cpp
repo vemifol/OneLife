@@ -82,26 +82,19 @@ void KeybindManager::loadAll() {
         delete [] path;
 
         if( f != NULL ) {
-            char buf[64];
-            buf[0] = '\0';
-            if( fgets( buf, sizeof( buf ), f ) != NULL ) {
-                int len = strlen( buf );
-                while( len > 0 &&
-                       ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
-                    buf[--len] = '\0';
-                    }
-                }
+            char buf[64] = "";
+            fscanf( f, "%63s", buf );
             fclose( f );
             parseKeyString( buf, &r->key, &r->modifiers );
             }
         else {
-            resetToDefault( r->actionName );
+            resetBinding( r->actionName );
             }
         }
     }
 
 
-void KeybindManager::saveAction( const char *inActionName ) {
+void KeybindManager::saveBinding( const char *inActionName ) {
     KeybindRecord *r = findAction( inActionName );
     if( r == NULL ) return;
 
@@ -127,17 +120,16 @@ void KeybindManager::setBinding( const char *inActionName, unsigned char inKey, 
     }
 
 
-void KeybindManager::clearToNone( const char *inActionName ) {
+void KeybindManager::clearBinding( const char *inActionName ) {
     setBinding( inActionName, 0, KEYBIND_MOD_NONE );
-    saveAction( inActionName );
+    saveBinding( inActionName );
     }
 
 
-void KeybindManager::resetToDefault( const char *inActionName ) {
+void KeybindManager::resetBinding( const char *inActionName ) {
     KeybindRecord *r = findAction( inActionName );
-    if( r == NULL ) return;
     parseKeyString( r->defaultKeyStr, &r->key, &r->modifiers );
-    saveAction( inActionName );
+    saveBinding( inActionName );
     }
 
 
@@ -177,8 +169,7 @@ char *KeybindManager::buildKeyString( const char *inActionName, char makeUpperca
     KeybindRecord *r = findAction( inActionName );
     if( r == NULL || ( r->key == 0 && r->modifiers == KEYBIND_MOD_NONE ) ) return stringDuplicate( "" );
 
-    char buf[64];
-    buf[0] = '\0';
+    char buf[64] = "";
 
     if( r->modifiers & KEYBIND_MOD_CTRL ) strcat( buf, "ctrl+" );
     if( r->modifiers & KEYBIND_MOD_SHIFT ) strcat( buf, "shift+" );
@@ -187,7 +178,7 @@ char *KeybindManager::buildKeyString( const char *inActionName, char makeUpperca
     else if( r->key == 30 ) strcat( buf, r->keyOnly ? ">>" : "for" );
     else if( r->key == 31 ) strcat( buf, r->keyOnly ? "<<" : "back" );
     else if( r->key == ' ' && r->keyOnly)  strcat( buf, "__" );
-    else if( r->key == ' ')  strcat( buf, "space" );
+    else if( r->key == ' ') strcat( buf, "space" );
     else if( r->key != 0 ) {
         int len = strlen( buf );
         buf[len] = (char)tolower( r->key );
@@ -212,7 +203,7 @@ char KeybindManager::checkActive( const char *inActionName, char inStrict ) {
     char needAlt = ( modifiers & KEYBIND_MOD_ALT ) != 0;
 
     if( !r->keyOnly ) {
-        if( inStrict ) {
+        if( !inStrict ) {
             if( needShift && !sShiftDown ) return false;
             if( needCtrl && !sControlDown ) return false;
             if( needAlt && !sAltDown ) return false;
@@ -231,11 +222,11 @@ char KeybindManager::checkActive( const char *inActionName, char inStrict ) {
 
 
 char KeybindManager::isActive( const char *inActionName ) {
-    return checkActive( inActionName, false );
+    return checkActive( inActionName, true );
     }
 
 char KeybindManager::isReleased( const char *inActionName ) {
-    return !checkActive( inActionName, true );
+    return !checkActive( inActionName, false );
     }
 
 void KeybindManager::ensureDirectory() {
@@ -287,27 +278,27 @@ void KeybindManager::clearAllPressed() {
         }
     }
 
-void KeybindManager::specialKeyDown( int inKey ) {
+void KeybindManager::specialKeyDown ( int inKey ) {
     if( inKey == MG_KEY_LSHIFT || inKey == MG_KEY_RSHIFT ) sShiftDown = true;
     else if( inKey == MG_KEY_LCTRL || inKey == MG_KEY_RCTRL ) sControlDown = true;
     else if( inKey == MG_KEY_LALT || inKey == MG_KEY_RALT ) sAltDown = true;
     }
 
-void KeybindManager::specialKeyUp ( int inKey ) { 
+void KeybindManager::specialKeyUp ( int inKey ) {
     if( inKey == MG_KEY_LSHIFT || inKey == MG_KEY_RSHIFT ) sShiftDown = false;
     else if( inKey == MG_KEY_LCTRL || inKey == MG_KEY_RCTRL ) sControlDown = false;
     else if( inKey == MG_KEY_LALT || inKey == MG_KEY_RALT ) sAltDown = false;
     }
 
-char KeybindManager::isShiftDown() { 
+char KeybindManager::isShiftDown() {
     return sShiftDown;
-}
+    }
 
-char KeybindManager::isControlDown() { 
+char KeybindManager::isControlDown() {
     return sControlDown;
-}
+    }
 
-char KeybindManager::isAltDown() { 
+char KeybindManager::isAltDown() {
     return sAltDown;
-}
+    }
 

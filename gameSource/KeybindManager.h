@@ -41,11 +41,11 @@ class KeybindManager {
         static KeybindRecord *findAction( const char *inActionName );
 
         static void loadAll();
-        static void saveAction( const char *inActionName );
+        static void saveBinding( const char *inActionName );
 
         static void setBinding( const char *inActionName, unsigned char inKey, int inModifiers );
-        static void clearToNone( const char *inActionName );
-        static void resetToDefault( const char *inActionName );
+        static void clearBinding( const char *inActionName );
+        static void resetBinding( const char *inActionName );
 
         static void parseKeyString( const char *inStr, unsigned char *outKey, int *outModifiers );
         static char *buildKeyString( const char *inActionName, char makeUppercase = false );
