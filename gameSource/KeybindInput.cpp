@@ -88,7 +88,7 @@ void KeybindInput::refreshText() {
         else setText( "[NONE]" );
         return;
         }
-    char *text = KeybindManager::buildKeyString( mActionName, true );
+    char *text = KeybindManager::buildKeyString( mActionName );
     setText( text );
     delete [] text;
     }

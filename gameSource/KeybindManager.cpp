@@ -176,8 +176,7 @@ char *KeybindManager::buildKeyString( KeybindRecord *inRecord, char inDisplay ) 
         if( len > 0 && buf[len - 1] == '+' ) buf[len - 1] = '\0';
         }
 
-    if( inDisplay ) return stringToUpperCase( buf );
-    return stringDuplicate( buf );
+    return stringToUpperCase( buf );
     }
 
 char *KeybindManager::buildKeyString( const char *inActionName, char inDisplay ) {
