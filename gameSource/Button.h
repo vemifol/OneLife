@@ -83,6 +83,8 @@ class Button : public PageComponent, public ActionListenerList {
         virtual void setActive( char inActive );
         virtual char isActive();
 
+        virtual void setDisabled( char inDisabled );
+
 
     protected:
 
@@ -104,6 +106,7 @@ class Button : public PageComponent, public ActionListenerList {
         char mHover;
         char mPressStartedHere;
         char mDragOver;
+        char mDisabled;
 
         double mWide, mHigh, mPixWidth;
         

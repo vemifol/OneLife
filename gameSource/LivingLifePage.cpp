@@ -24,6 +24,7 @@
 #include "liveAnimationTriggers.h"
 
 #include "KeybindManager.h"
+#include "ComponentTag.h"
 
 #include "../commonSource/fractalNoise.h"
 #include "../commonSource/sayLimit.h"
@@ -201,6 +202,9 @@ char objectSearchEnabled = false;
 char familyDisplayEnabled = false;
 char dangerousTileEnabled = false;
 char alwaysShowPlayerLabelEnabled = false;
+
+char toggleAlpha = false;
+char toggleBeta = false;
 
 static JenkinsRandomSource randSource( 340403 );
 static JenkinsRandomSource remapRandSource( 340403 );
@@ -4265,37 +4269,39 @@ LivingLifePage::LivingLifePage()
         familyDisplayEnabled = true;
         }
 
-    KeybindManager::registerAction( "moveUp", "UP", "w", KEY_ONLY );
-    KeybindManager::registerAction( "moveLeft", "LEFT", "a", KEY_ONLY );
-    KeybindManager::registerAction( "moveDown", "DOWN", "s", KEY_ONLY );
-    KeybindManager::registerAction( "moveRight", "RIGHT", "d", KEY_ONLY );
-    KeybindManager::registerAction( "alphaBelow", "BELOW", "space", KEY_ONLY );
+    KeybindManager::registerAction( "moveUp", "UP", "w", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveLeft", "LEFT", "a", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveDown", "DOWN", "s", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "moveRight", "RIGHT", "d", TAG_MOVE, KEY_ONLY );
+    KeybindManager::registerAction( "alphaBelow", "BELOW", "space", TAG_MOVE, KEY_ONLY );
 
-    KeybindManager::registerAction( "alphaModifier", "ALPHA", "shift", MODIFIER_ONLY );
-    KeybindManager::registerAction( "betaModifier", "BETA", "ctrl", MODIFIER_ONLY );
+    KeybindManager::registerAction( "alphaModifier", "ALPHA", "shift", TAG_MOVE_MODIFIER, MODIFIER_ONLY );
+    KeybindManager::registerAction( "betaModifier", "BETA", "ctrl", TAG_MOVE_MODIFIER, MODIFIER_ONLY );
+    KeybindManager::registerAction( "alphaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
+    KeybindManager::registerAction( "betaToggle", "TOGGLE", "", TAG_MOVE_MODIFIER, KEY_ONLY );
 
-    KeybindManager::registerAction( "useHat", "USE", "ctrl+t" );
-    KeybindManager::registerAction( "useHatReplace", "REPLACE", "ctrl+shift+t" );
-    KeybindManager::registerAction( "useHatRemv", "REMV", "" );
+    KeybindManager::registerAction( "useHat", "USE", "ctrl+t", TAG_HAT );
+    KeybindManager::registerAction( "useHatReplace", "REPLACE", "ctrl+shift+t", TAG_HAT );
+    KeybindManager::registerAction( "useHatRemv", "REMV", "", TAG_HAT );
 
-    KeybindManager::registerAction( "useTop", "USE", "shift+t" );
-    KeybindManager::registerAction( "useTopReplace", "REPLACE", "" );
-    KeybindManager::registerAction( "useTopRemv", "REMV", "" );
+    KeybindManager::registerAction( "useTop", "USE", "shift+t", TAG_TOP );
+    KeybindManager::registerAction( "useTopReplace", "REPLACE", "", TAG_TOP );
+    KeybindManager::registerAction( "useTopRemv", "REMV", "", TAG_TOP );
 
-    KeybindManager::registerAction( "useBottom", "USE", "t" );
-    KeybindManager::registerAction( "useBottomReplace", "REPLACE", "" );
-    KeybindManager::registerAction( "useBottomRemv", "REMV", "" );
+    KeybindManager::registerAction( "useBottom", "USE", "t", TAG_BOTTOM );
+    KeybindManager::registerAction( "useBottomReplace", "REPLACE", "", TAG_BOTTOM );
+    KeybindManager::registerAction( "useBottomRemv", "REMV", "", TAG_BOTTOM );
 
-    KeybindManager::registerAction( "useBackpack", "USE", "q" );
-    KeybindManager::registerAction( "useBackpackReplace", "REPLACE", "shift+q" );
+    KeybindManager::registerAction( "useBackpack", "USE", "q", TAG_BACK );
+    KeybindManager::registerAction( "useBackpackReplace", "REPLACE", "shift+q", TAG_BACK );
 
-    KeybindManager::registerAction( "selfBackpackTransRemv", "TRANS/REMV", "b" );
-    KeybindManager::registerAction( "selfBackpackTrans", "TRANS", "shift+b" );
-    KeybindManager::registerAction( "selfBackpackRemv", "REMV", "ctrl+b" );
+    KeybindManager::registerAction( "selfBackpackTransRemv", "TRANS/REMV", "b", TAG_BACK );
+    KeybindManager::registerAction( "selfBackpackTrans", "TRANS", "shift+b", TAG_BACK );
+    KeybindManager::registerAction( "selfBackpackRemv", "REMV", "ctrl+b", TAG_BACK );
 
-    KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e" );
+    KeybindManager::registerAction( "eatSelf", "EAT/SELF", "e", 0, KEY_ONLY );
     KeybindManager::registerAction( "removeClothing", "REMOVE CLOTHING", "shift+e" );
-    KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c" );
+    KeybindManager::registerAction( "pickUpBaby", "PICK UP BABY", "c", 0, KEY_ONLY );
 
 
     KeybindManager::registerAction( "coordinatesToggle", "COORDINATES PANEL", "g" );
@@ -4303,12 +4309,12 @@ LivingLifePage::LivingLifePage()
     KeybindManager::registerAction( "objectSearchToggle", "OBJECT SEARCH PANEL", "j" );
     KeybindManager::registerAction( "familyDisplayToggle", "FAMILY DISPLAY PANEL", "p" );
 
-    KeybindManager::registerAction( "sayCommand", "SAY COMMAND", "/", KEY_ONLY );
-    KeybindManager::registerAction( "openChat", "OPEN CHAT", "enter", KEY_ONLY );
+    KeybindManager::registerAction( "sayCommand", "SAY COMMAND", "/", 0, KEY_ONLY );
+    KeybindManager::registerAction( "openChat", "OPEN CHAT", "enter", 0, KEY_ONLY );
 
     KeybindManager::registerAction( "minitechMinimize", "MINIMIZE CRAFTING GUIDE", "v" );
     KeybindManager::registerAction( "minitechSwitchMode", "SWITCH USE/MAKE MODE", "ctrl+v" );
-    KeybindManager::registerAction( "minitechPageNext", "CRAFTING GUIDE NEXT PAGE", "tab", KEY_ONLY );
+    KeybindManager::registerAction( "minitechPageNext", "CRAFTING GUIDE NEXT PAGE", "tab" );
     KeybindManager::registerAction( "minitechPagePrev", "CRAFTING GUIDE PREV PAGE", "shift+tab" );
     KeybindManager::registerAction( "minitechNextObj", "CRAFTING GUIDE NEXT OBJECT", "ctrl+x" );
     KeybindManager::registerAction( "minitechPrevObj", "CRAFTING GUIDE PREV OBJECT", "ctrl+z" );
@@ -27858,8 +27864,16 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
 
     if( SettingsManager::getIntSetting( "keyboardActions", 1 ) ) {
         if( !mSayField.isFocused() && !vogMode ) {
-            char alphaActive = KeybindManager::isActive( "alphaModifier" );
-            char betaActive = KeybindManager::isActive( "betaModifier" );
+            if( KeybindManager::isActive( "alphaToggle" ) ) {
+                toggleAlpha = !toggleAlpha;
+                return;
+                }
+            if( KeybindManager::isActive( "betaToggle" ) ) {
+                toggleBeta = !toggleBeta;
+                return;
+                }
+            char alphaActive = toggleAlpha || KeybindManager::isActive( "alphaModifier" );
+            char betaActive = toggleBeta || KeybindManager::isActive( "betaModifier" );
             if( handleMoveAction( "moveUp", &upKeyDown, alphaActive, betaActive, 0, 1 ) ) return;
             if( handleMoveAction( "moveLeft", &leftKeyDown, alphaActive, betaActive, -1, 0 ) ) return;
             if( handleMoveAction( "moveDown", &downKeyDown, alphaActive, betaActive, 0, -1 ) ) return;

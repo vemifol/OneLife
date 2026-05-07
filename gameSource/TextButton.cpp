@@ -60,7 +60,9 @@ void TextButton::drawContents() {
     // leave draw color set by Button
     
     doublePair textPos = { 0, 0 };
-    
+    if ( mDisabled ) {
+        setDrawColor ( mDisabledFontColor );
+    }
     mFont->drawString( mLabelText, textPos, alignCenter );
     }
 
@@ -69,4 +71,12 @@ void TextButton::drawContents() {
 void TextButton::setFont( Font *inFont ) {
     mFont = inFont;
     }
+
+void TextButton::setDisabledFontColor( float r, float g, float b, float a ) {
+    mDisabledFontColor.r = r;
+    mDisabledFontColor.g = g;
+    mDisabledFontColor.b = b;
+    mDisabledFontColor.a = a;
+    }
+
 

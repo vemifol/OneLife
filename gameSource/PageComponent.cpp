@@ -7,11 +7,12 @@
 extern Font *tinyHandwritingFontFixedSize;
 extern double viewWidth;
 
-PageComponent::PageComponent( double inX, double inY )
+PageComponent::PageComponent( double inX, double inY, int inTags )
         : mX( inX ), mY( inY ), mParent( NULL ), mVisible( true ),
           mIgnoreEvents( false ),
           mMouseEventHog( NULL ),
-          mCursorTip( NULL ) {
+          mCursorTip( NULL ),
+          mTags( 0 ) {
     
     }
         
@@ -159,7 +160,9 @@ void PageComponent::setCursorTip( const char *inTip ) {
 
 void PageComponent::base_pointerMove( float inX, float inY ){
     
-    pointerPos = {inX, inY};
+    if( mParent == NULL ) {
+        pointerPos = {inX, inY};
+        }
     
     // Displaying cursor tips even when mIgnoreEvents is true
     if( mIgnoreEvents && mCursorTip == NULL ) {
@@ -380,3 +383,11 @@ void PageComponent::setHogMouseEvents( char inHogMouseEvents ) {
 void PageComponent::setMouseEventHog( PageComponent *inHog ) {
     mMouseEventHog = inHog;
     }
+
+void PageComponent::setTags( int inTags ) {
+    mTags = inTags;
+}
+
+int PageComponent::getTags() {
+    return mTags;
+}

@@ -14,14 +14,17 @@
 #include "soundBank.h"
 #include "objectBank.h"
 #include "buttonStyle.h"
-
 #ifdef USE_DISCORD
 #include "DiscordController.h"
 #endif // USE_DISCORD
 
 #include "DropdownList.h"
+#include "ComponentTag.h"
 
 extern Font * mainFont;
+
+// Defined in PageComponent.cpp — current mouse position in world (UI) coords.
+extern doublePair pointerPos;
 
 extern float musicLoudness;
 
@@ -58,19 +61,20 @@ SettingsPage::SettingsPage()
           // Left Pane
           mRestartButton( mainFont, 360, -272, translate( "restartButton" ) ),
           
-          mGameplayButton( mainFont, -452.5, 288, "GAMEPLAY" ),
-          mControlButton( mainFont, -452.5, 192, "CONTROL" ),
-          mScreenButton( mainFont, -452.5, 96, "SCREEN" ),
-          mSoundButton( mainFont, -452.5, 0, "SOUND" ),
+          mGameplayButton( mainFont, -452.5, 264, "GAMEPLAY" ),
+          mControlButton( mainFont, -452.5, 188, "CONTROL" ),
+          mScreenButton( mainFont, -452.5, 112, "SCREEN" ),
+          mSoundButton( mainFont, -452.5, 36, "SOUND" ),
 #ifdef USE_DISCORD
-          mDiscordButton( mainFont, -452.5, -96, "DISCORD" ),
+          mDiscordButton( mainFont, -452.5, -40, "DISCORD" ),
 #endif // USE_DISCORD
-          mAdvancedButton( mainFont, -452.5, -192, "ADVANCED" ),
+          mAdvancedButton( mainFont, -452.5, -116, "ADVANCED" ),
+          mKeybindsButton( mainFont, -452.5, -192, "KEYBINDS" ),
 
           mBackButton( mainFont, -452.5, -288, translate( "backButton" ) ),
           
           mEditAccountButton( mainFont, -463, 129, translate( "editAccount" ) ),
-
+          
           // Gameplay
           mEnableFOVBox( 561, 128, 4 ),
           mEnableCenterCameraBox( 561, 52, 4 ),
@@ -135,8 +139,11 @@ SettingsPage::SettingsPage()
         mEnableDangerousTileBox(0, -72, 4),
         mGenerateTownPlannerMapsBox( 561, 52, 4 ),
         mEnableShowingHeldFoodPips( 561, 52, 4 ),
-        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ) {
-                            
+        mEnableAlwaysShowPlayerLabelsBox( 561, 52, 4 ),
+        
+        // Keybinds
+        mClothingFilter( mainFont, 0, 0, 4, LinkedCheckbox::single, alignRight, 4 ),
+        mMovementGroup( new KeybindGroup( mainFont, 0, 0, 1 ) ) {
 
     
     // Adding components below in reverse order so cursor tip is drawn on top
@@ -169,6 +176,20 @@ SettingsPage::SettingsPage()
     mCommandShortcuts.setWidth( 360 );
     mCommandShortcuts.useClearButton( true );
     mCommandShortcuts.setFireOnLoseFocus( true );
+
+    // Keybinds
+    addComponent(&mClothingFilter);
+    mClothingFilter.addActionListener( this );
+    mClothingFilter.setStartPosition(-185, 264);
+    mClothingFilter.setAutoSpacing(0, -45);
+    mClothingFilter.setLabel(0, "HAT");
+    mClothingFilter.setLabel(1, "TOP");
+    mClothingFilter.setLabel(2, "BOTTOM");
+    mClothingFilter.setLabel(3, "BACK");
+
+    addComponent( mMovementGroup );
+    mMovementGroup->setVisible( false );
+
     
 #ifdef USE_DISCORD
     // Discord
@@ -257,6 +278,11 @@ SettingsPage::SettingsPage()
     mEnableFOVBox.addActionListener( this );
     
     // Left pane
+    setButtonStyle( &mKeybindsButton );
+    mKeybindsButton.setSize( 175, 60 );
+    addComponent( &mKeybindsButton );
+    mKeybindsButton.addActionListener( this );
+
     setButtonStyle(&mAdvancedButton);
     mAdvancedButton.setSize(175, 60);
     addComponent(&mAdvancedButton);
@@ -318,6 +344,7 @@ SettingsPage::SettingsPage()
     mDiscordButton.setCursorTip("DISCORD RICH PRESENCE SETTINGS");
 #endif // USE_DISCORD
     mAdvancedButton.setCursorTip("ADVANCED GAMEPLAY SETTINGS");
+    mKeybindsButton.setCursorTip( "REMAP KEYBINDS" );
 
     mBackButton.setCursorTip( "GO BACK" );
     
@@ -359,6 +386,8 @@ SettingsPage::SettingsPage()
     mEnableShowingHeldFoodPips.setCursorTip( "SHOW FOOD PIPS OF THE FOOD YOU'RE HOLDING" );
     mEnableAlwaysShowPlayerLabelsBox.setCursorTip( "ALWAYS SHOW PLAYER NAME LABELS" );
     
+    // Keybinds
+
     mOldFullscreenSetting = 
         SettingsManager::getIntSetting( "fullscreen", 1 );
     
@@ -488,6 +517,9 @@ SettingsPage::SettingsPage()
 
     mEnableAlwaysShowPlayerLabelsBox.setToggled( alwaysShowPlayerLabelEnabled );
     
+    // Keybinds
+
+
     
 
     mPage = 0;
@@ -504,6 +536,11 @@ SettingsPage::~SettingsPage() {
     clearSoundUsage( &mTestSound );
 
     delete mCursorModeSet;
+    delete mMovementGroup;
+
+    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+        delete mKeybindInputs.getElementDirect( i );
+        }
     }
 
 
@@ -904,6 +941,10 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
     else if ( inTarget == &mAdvancedButton ) {
         mPage = 5;
         }
+    else if( inTarget == &mKeybindsButton ) {
+        mPage = 6;
+        buildKeybindWidgets();
+        }
     else if( inTarget == &mCommandShortcuts ) {
         commandShortcutsRawText = mCommandShortcuts.getAndUpdateRawText();
         SettingsManager::setSetting( "commandShortcuts", commandShortcutsRawText );
@@ -1284,6 +1325,18 @@ void SettingsPage::draw( doublePair inViewCenter,
 
         drawTextWithShadow("ALWAYS SHOW NAMES", pos, alignRight);
         }
+
+    // Always show cursor UI coords so widget positions are easy to read off.
+    {
+    char coordBuf[64];
+    sprintf( coordBuf, "%.0f, %.0f", pointerPos.x, pointerPos.y );
+    doublePair coordPos = { pointerPos.x + 16, pointerPos.y + 16 };
+    setDrawColor( 0, 0, 0, 1 );
+    doublePair shadowPos = { coordPos.x - 1, coordPos.y - 1 };
+    mainFont->drawString( coordBuf, shadowPos, alignLeft );
+    setDrawColor( 1, 1, 0, 1 );
+    mainFont->drawString( coordBuf, coordPos, alignLeft );
+    }
     }
 
 
@@ -1503,7 +1556,38 @@ void SettingsPage::updatePage() {
     mGenerateTownPlannerMapsBox.setVisible(mPage == 5);
     mEnableShowingHeldFoodPips.setVisible(mPage == 5);
     mEnableAlwaysShowPlayerLabelsBox.setVisible(mPage == 5);
+
+
+
+    for( int i = 0; i < mKeybindInputs.size(); i++ ) {
+        KeybindInput *p = mKeybindInputs.getElementDirect( i );
+        p->setVisible( false );
+        }
     
+    setVisibleByTag( TAG_MOVE, mPage == 6 );
+    setVisibleByTag ( TAG_MOVE_MODIFIER, mPage == 6 );
+
+    mClothingFilter.setVisible( mPage == 6 );
+    mMovementGroup->setVisible( mPage == 6 );
+
+
+    if( mPage == 6 ) {
+        double inputX = 140;
+        double startY = 264;
+
+        int clothingSelected = 0;
+        for( int i = 0; i < mClothingFilter.getNumOptions(); i++ ) {
+            int tag = (1 << i);
+            setVisibleByTag( tag, mClothingFilter.isChecked( i ) );
+            if( mClothingFilter.isChecked( i ) ) {
+                clothingSelected = tag;
+                }
+            }
+        positionByTag( clothingSelected, inputX, startY, lineSpacing );
+        }
+
+
+
     mGameplayButton.setActive( mPage != 0 );
     mControlButton.setActive( mPage != 1 );
     mScreenButton.setActive( mPage != 2 );
@@ -1514,8 +1598,98 @@ void SettingsPage::updatePage() {
 #endif // USE_DISCORD
 
     mAdvancedButton.setActive( mPage != 5 );
+    mKeybindsButton.setActive( mPage != 6 );
+    }
 
-}
+
+void SettingsPage::buildKeybindWidgets() {
+    if( mKeybindInputs.size() > 0 ) return;
+
+    int numActions = KeybindManager::getActionCount();
+    if( numActions == 0 ) return;
+
+
+
+    for( int i = 0; i < numActions; i++ ) {
+        KeybindRecord *r = KeybindManager::getAction( i );
+        KeybindInput *inp = new KeybindInput( mainFont, 0, 0, 0, r->actionName );
+        inp->setTags( r->tags );
+        inp->setLabelText( r->displayLabel );
+        double width = 241;
+
+    
+        /*
+        getFontHeight() = charWidth × scale = 32
+        spacing = (N-1) * mCharSpacing ( 3 for main font )
+        lineSpacing = 52 ( +4 )
+
+        1 -> 32 + (1 - 1) + 16 = 48
+        2 -> 32*2 + (2 - 1) + 16 = 83
+        3 -> 32*3 + (3 - 1) + 16 = 118
+        
+        "W" = 21 -> 32 - 21 = 11 spacing
+        "SHIFT" = 62 + 27 = 89
+        "RESET" = 70
+
+        1 key = 48
+        Max keybind length: "CTRL+SHIFT+SPACE" = 214 + 11 + 16  = 241
+        Min length: "[NONE]" = 81 + 11 + 16 = 108
+        Min length: "[ ]" / "[]" = 24 / 17
+        
+        "RESET" = 70
+
+
+        */
+
+
+        if ( r->modifierOnly ) {
+            width = 108;
+        }
+        else if ( r->keyOnly ) {
+            width = 48;
+        }
+
+        
+
+        inp->setWidth ( width );
+        mKeybindInputs.push_back( inp );
+        addComponent( inp );
+        if ( r->tags & TAG_MOVE ) {
+            if ( strcmp( r->actionName, "moveUp" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 );
+                }
+            if ( strcmp( r->actionName, "moveDown" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "moveRight" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190 + 52, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "moveLeft" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190 - 52, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "alphaBelow" ) == 0 ) {
+                mMovementGroup->addInput( inp, -190, -40 - 52 - 55 );
+                inp->setWidth ( 48*3 + 4*2 );
+                }
+            inp->addActionListener( mMovementGroup );
+            }
+        
+            if ( strcmp( r->actionName, "alphaModifier" ) == 0 ) {
+                inp->setPosition ( 70, -40 );
+                }
+            if ( strcmp( r->actionName, "alphaToggle" ) == 0 ) {
+                inp->setPosition ( 380, -40 );
+                }
+            if ( strcmp( r->actionName, "betaModifier" ) == 0 ) {
+                inp->setPosition ( 70, -40 - 52 );
+                }
+            if ( strcmp( r->actionName, "betaToggle" ) == 0 ) {
+                inp->setPosition ( 380, -40 - 52 );
+                }
+        inp->addActionListener( this );
+
+        }
+    }
 
 void SettingsPage::checkRestartRequired() {
     if( mOldFullscreenSetting != mFullscreenBox.getToggled() ||
@@ -1532,5 +1706,27 @@ void SettingsPage::checkRestartRequired() {
     else {
         setStatus( NULL, false );
         mRestartButton.setVisible( false );
+        }
+    }
+
+void SettingsPage::setVisibleByTag( int inTag, char inVisible ) {
+    for( int i=0; i<mComponents.size(); i++ ) {
+        PageComponent *c = *mComponents.getElement(i);
+        if( c->getTags() & inTag ) {
+            c->setVisible( inVisible );
+            }
+        }
+    }
+
+
+void SettingsPage::positionByTag( int inTag, double inX,
+                                          double inStartY, double inSpacing ) {
+    int index = 0;
+    for( int i = 0; i < mComponents.size(); i++ ) {
+        PageComponent *c = *mComponents.getElement( i );
+        if( c->getTags() & inTag ) {
+            c->setPosition( inX, inStartY - inSpacing * index );
+            index++;
+            }
         }
     }

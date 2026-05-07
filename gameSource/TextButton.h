@@ -29,10 +29,13 @@ class TextButton : public Button {
         
         
         void setFont( Font *inFont );
+
+        void setDisabledFontColor ( float r, float g, float b, float a );
         
 
     protected:
         Font *mFont;
+        FloatColor mDisabledFontColor;
         char *mLabelText;
     
         // override

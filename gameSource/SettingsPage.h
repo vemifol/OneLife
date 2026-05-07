@@ -7,9 +7,12 @@
 #include "SoundUsage.h"
 #include "DropdownList.h"
 #include "Background.h"
-
+#include "KeybindInput.h"
+#include "KeybindGroup.h"
+#include "LinkedCheckbox.h"
 
 #include "minorGems/ui/event/ActionListener.h"
+#include "minorGems/util/SimpleVector.h"
 
 
 
@@ -74,6 +77,7 @@ class SettingsPage : public GamePage, public ActionListener {
         TextButton mDiscordButton;
 #endif // USE_DISCORD
         TextButton mAdvancedButton;
+        TextButton mKeybindsButton;
 
         TextButton mBackButton;
         
@@ -130,7 +134,18 @@ class SettingsPage : public GamePage, public ActionListener {
         CheckboxButton mEnableShowingHeldFoodPips;
         CheckboxButton mEnableAlwaysShowPlayerLabelsBox;
         
+
+        // Keybinds
+        LinkedCheckbox mClothingFilter;
+        KeybindGroup *mMovementGroup;
+        SimpleVector<KeybindInput *> mKeybindInputs;
+        void buildKeybindWidgets();
         
+        void setVisibleByTag( int inTag, char inVisible );
+        void positionByTag( int inTag, double inX, double inStartY, double inSpacing );
+
+
         void checkRestartButtonVisibility();
-        
+
+
     };

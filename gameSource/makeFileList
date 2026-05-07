@@ -46,7 +46,6 @@ liveObjectSet.cpp \
 ../commonSource/sayLimit.cpp \
 ExistingAccountPage.cpp \
 KeyEquivalentTextButton.cpp \
-KeybindManager.cpp \
 ServerActionPage.cpp \
 FinalMessagePage.cpp \
 AutoUpdatePage.cpp \
@@ -56,8 +55,12 @@ fft.cpp \
 ogg.cpp \
 musicPlayer2.cpp \
 groundSprites.cpp \
+KeybindManager.cpp \
+KeybindInput.cpp \
+KeybindGroup.cpp \
 SettingsPage.cpp \
 CheckboxButton.cpp \
+LinkedCheckbox.cpp \
 ValueSlider.cpp \
 SpriteButton.cpp \
 SpriteToggleButton.cpp \

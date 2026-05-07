@@ -34,13 +34,14 @@ void KeybindManager::deInit() {
     sInited = false;
     }
 
-void KeybindManager::registerAction( const char *inActionName, const char *inDisplayLabel, const char *inDefaultKeyStr, KeybindType inType ) {
+void KeybindManager::registerAction( const char *inActionName, const char *inDisplayLabel, const char *inDefaultKeyStr, int inTags, KeybindType inType ) {
     KeybindRecord *r = new KeybindRecord;
     r->actionName = stringDuplicate( inActionName );
     r->displayLabel = stringDuplicate( inDisplayLabel );
     r->defaultKeyStr = stringDuplicate( inDefaultKeyStr );
     r->key = 0;
     r->modifiers = KEYBIND_MOD_NONE;
+    r->tags = inTags;
     r->modifierOnly = false;
     r->keyOnly = false;
     if( inType == KEY_ONLY ) r->keyOnly = true;

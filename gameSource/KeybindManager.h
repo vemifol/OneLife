@@ -20,6 +20,7 @@ struct KeybindRecord {
     unsigned char key;
     int modifiers;
     char *defaultKeyStr;
+    int tags;
     char modifierOnly;
     char keyOnly;
     };
@@ -33,7 +34,7 @@ class KeybindManager {
         static void deInit();
 
         // creates a KeybindRecord with keybind details. set default key str to "" if it should be unbinded by default.
-        static void registerAction( const char *inActionName, const char *inDisplayLabel, const char *inDefaultKeyStr, KeybindType inType = DEFAULT_TYPE );
+        static void registerAction( const char *inActionName, const char *inDisplayLabel, const char *inDefaultKeyStr, int inTags = 0, KeybindType inType = DEFAULT_TYPE );
         static int getActionCount();
         // gets keybind record by index in sActions
         static KeybindRecord *getAction( int inIndex );

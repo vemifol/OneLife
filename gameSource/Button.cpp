@@ -16,7 +16,8 @@ Button::Button( double inX, double inY,
           mWide( inWide ), mHigh( inHigh ), mPixWidth( inPixelSize ),
           mMouseOverTip( NULL ),
           mBracketCoverLength( -1.0 ),
-          mDrawBackground( true ) {
+          mDrawBackground( true ), 
+          mDisabled( false ) {
     
     // Text Color
     setNoHoverColor( 1, 1, 1, 1 );
@@ -101,6 +102,11 @@ void Button::setVisible( char inIsVible ) {
     }
 
 
+void Button::setDisabled ( char inDisabled ) {
+    mDisabled = inDisabled;
+    if( inDisabled ) mHover = false;
+    }
+
 
 double Button::getWidth() {
     return mWide;
@@ -135,7 +141,7 @@ void Button::draw() {
         else if( mHover && ! mDragOver ) {    
             setDrawColor( mHoverBorderColor );
             }
-        else if( mDragOver ) {
+        else if( mDragOver || mDisabled ) {
             setDrawColor( mDragOverBorderColor );
             }
         else {
@@ -151,7 +157,7 @@ void Button::draw() {
         else if( mHover && ! mDragOver ) {    
             setDrawColor( mHoverFillColor );
             }
-        else if( mDragOver ) {
+        else if( mDragOver || mDisabled ) {
             setDrawColor( mDragOverFillColor );
             }
         else {
