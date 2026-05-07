@@ -1326,17 +1326,6 @@ void SettingsPage::draw( doublePair inViewCenter,
         drawTextWithShadow("ALWAYS SHOW NAMES", pos, alignRight);
         }
 
-    // Always show cursor UI coords so widget positions are easy to read off.
-    {
-    char coordBuf[64];
-    sprintf( coordBuf, "%.0f, %.0f", pointerPos.x, pointerPos.y );
-    doublePair coordPos = { pointerPos.x + 16, pointerPos.y + 16 };
-    setDrawColor( 0, 0, 0, 1 );
-    doublePair shadowPos = { coordPos.x - 1, coordPos.y - 1 };
-    mainFont->drawString( coordBuf, shadowPos, alignLeft );
-    setDrawColor( 1, 1, 0, 1 );
-    mainFont->drawString( coordBuf, coordPos, alignLeft );
-    }
     }
 
 

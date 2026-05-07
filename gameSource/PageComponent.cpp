@@ -160,9 +160,7 @@ void PageComponent::setCursorTip( const char *inTip ) {
 
 void PageComponent::base_pointerMove( float inX, float inY ){
     
-    if( mParent == NULL ) {
-        pointerPos = {inX, inY};
-        }
+    pointerPos = {inX, inY};
     
     // Displaying cursor tips even when mIgnoreEvents is true
     if( mIgnoreEvents && mCursorTip == NULL ) {
